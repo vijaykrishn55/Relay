@@ -39,7 +39,7 @@ function ModelCard({ model }) {
                         </div>
 
                         {/* Metrics */}
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
                                 <div className="flex items-center gap-2">
                                         <div className="bg-purple-50 p-2 rounded">
                                                 <DollarSign size={16} className="text-purple-600" />
@@ -57,6 +57,19 @@ function ModelCard({ model }) {
                                         <div>
                                                 <p className="text-xs text-gray-500">Avg Latency</p>
                                                 <p className="text-sm font-bold text-gray-800">{model.avgLatency}ms</p>
+                                        </div>
+                                </div>
+
+                                {/* NEW: Rate Limit Display */}
+                                <div className="flex items-center gap-2">
+                                        <div className="bg-blue-50 p-2 rounded">
+                                                <span className="text-blue-600 text-xs font-bold">RPM</span>
+                                        </div>
+                                        <div>
+                                                <p className="text-xs text-gray-500">Rate Limit</p>
+                                                <p className="text-sm font-bold text-gray-800">
+                                                        {model.rateLimit?.rpm || 'N/A'}/min
+                                                </p>
                                         </div>
                                 </div>
                         </div>

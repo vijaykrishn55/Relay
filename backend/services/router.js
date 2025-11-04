@@ -1,0 +1,267 @@
+class AIRouter {
+  constructor(models) {
+    this.models = models;
+  }
+  // Analyze input to determine required capabilities
+  analyzeInput(input) {
+    const inputLower = input.toLowerCase();
+    const detectedCapabilities = ["text-generation"]; // Always needed
+
+    // Reasoning/Logic detection
+    const reasoningKeywords = [
+      "solve",
+      "puzzle",
+      "logic",
+      "reasoning",
+      "think",
+      "analyze",
+      "explain why",
+      "deduce",
+      "infer",
+      "conclude",
+      "prove",
+    ];
+    if (reasoningKeywords.some((keyword) => inputLower.includes(keyword))) {
+      detectedCapabilities.push("reasoning");
+    }
+
+    // Thinking/Deep analysis detection
+    const thinkingKeywords = [
+      "thinking",
+      "philosophy",
+      "complex",
+      "deep",
+      "theoretical",
+      "hypothesis",
+      "argument",
+      "debate",
+    ];
+    if (thinkingKeywords.some((keyword) => inputLower.includes(keyword))) {
+      detectedCapabilities.push("thinking");
+    }
+
+    // Code detection
+    const codeKeywords = [
+      "code",
+      "function",
+      "class",
+      "program",
+      "script",
+      "debug",
+      "python",
+      "javascript",
+      "react",
+      "java",
+      "write a",
+    ];
+    if (codeKeywords.some((keyword) => inputLower.includes(keyword))) {
+      detectedCapabilities.push("code");
+    }
+
+    // Documentation detection
+    const docKeywords = ["document", "documentation", "readme", "comment"];
+    if (docKeywords.some((keyword) => inputLower.includes(keyword))) {
+      detectedCapabilities.push("documentation");
+    }
+
+    console.log(
+      `🔍 Detected capabilities from input: ${detectedCapabilities.join(", ")}`
+    );
+    return detectedCapabilities;
+  }
+  // Analyze input to detect intent
+  analyzeIntent(input) {
+    const inputLower = input.toLowerCase();
+    const hints = [];
+
+    // Detect if question needs thinking/reasoning
+    if (
+      inputLower.includes("puzzle") ||
+      inputLower.includes("logic") ||
+      inputLower.includes("solve") ||
+      inputLower.includes("why") ||
+      inputLower.includes("explain") ||
+      inputLower.includes("philosophical")
+    ) {
+      hints.push("thinking", "reasoning");
+    }
+
+    // Detect if question needs code
+    if (
+      inputLower.includes("code") ||
+      inputLower.includes("function") ||
+      inputLower.includes("algorithm") ||
+      inputLower.includes("program") ||
+      inputLower.includes("script")
+    ) {
+      hints.push("code");
+    }
+
+    // Detect if question needs analysis
+    if (
+      inputLower.includes("analyze") ||
+      inputLower.includes("compare") ||
+      inputLower.includes("evaluate")
+    ) {
+      hints.push("analysis");
+    }
+
+    return hints;
+  }
+  //main routing logic
+ selectModel(request) {
+  const { strategy = 'balanced', requiredCapabilities = [], input = '' } = request
+  
+  // Analyze input for hints
+  const hints = this.analyzeIntent(input)
+  
+  // Merge hints with required capabilities
+  const allRequiredCapabilities = [...new Set([...requiredCapabilities, ...hints])]
+  
+  console.log(`🔍 Detected capabilities needed: ${allRequiredCapabilities.join(', ') || 'none'}`)
+  
+  // Filter models by capabilities and active status
+  let eligibleModels = this.models.filter(model =>
+    model.status === 'active' &&
+    allRequiredCapabilities.every(cap => model.capabilities.includes(cap))
+  )
+  
+  if (eligibleModels.length === 0) {
+    console.log('⚠️ No models match all requirements, relaxing constraints...')
+    // Fallback: just check active status
+    eligibleModels = this.models.filter(model => model.status === 'active')
+  }
+  
+  // Apply routing strategy
+  switch (strategy) {
+    case 'cost-optimized':
+      return this.selectByCost(eligibleModels)
+    
+    case 'performance-optimized':
+      return this.selectByLatency(eligibleModels)
+    
+    case 'quality-optimized':
+      return this.selectByQuality(eligibleModels)
+    
+    case 'balanced':
+    default:
+      return this.selectBalanced(eligibleModels)
+  }
+}
+
+  // strategy : choose cheapest model (if tied, pick fastest)
+  selectByCost(models) {
+    return models.reduce((cheapest, current) => {
+      // If costs are equal, pick the one with lower latency
+      if (current.costPer1k === cheapest.costPer1k) {
+        return current.avgLatency < cheapest.avgLatency ? current : cheapest;
+      }
+      return current.costPer1k < cheapest.costPer1k ? current : cheapest;
+    });
+  }
+  //for fastest model
+  selectByLatency(models) {
+    return models.reduce((fastest, current) =>
+      current.avgLatency < fastest.avgLatency ? current : fastest
+    );
+  }
+
+  // For highest quality model - prioritize reasoning and thinking capabilities
+  selectByQuality(models) {
+    return models.reduce((best, current) => {
+      // Calculate quality score based on capability types
+      const calculateQualityScore = (model) => {
+        let score = 0;
+
+        // High-value capabilities (weighted scoring)
+        if (model.capabilities.includes("thinking")) score += 100;
+        if (model.capabilities.includes("reasoning")) score += 80;
+        if (model.capabilities.includes("analysis")) score += 70;
+        if (model.capabilities.includes("code")) score += 50;
+        if (model.capabilities.includes("documentation")) score += 40;
+        if (model.capabilities.includes("text-generation")) score += 20;
+
+        // Add latency as tiebreaker (higher latency = more thorough)
+        score += model.avgLatency * 0.1;
+
+        return score;
+      };
+
+      const currentScore = calculateQualityScore(current);
+      const bestScore = calculateQualityScore(best);
+
+      return currentScore > bestScore ? current : best;
+    });
+  }
+  // Balanced selection - considers speed, capabilities quality, and diversity
+  selectBalanced(models) {
+    const maxLatency = Math.max(...models.map((m) => m.avgLatency));
+
+    const scored = models.map((model) => {
+      // Quality score based on capability types
+      let qualityScore = 0;
+      if (model.capabilities.includes("thinking")) qualityScore += 50;
+      if (model.capabilities.includes("reasoning")) qualityScore += 40;
+      if (model.capabilities.includes("analysis")) qualityScore += 30;
+      if (model.capabilities.includes("code")) qualityScore += 25;
+      if (model.capabilities.includes("documentation")) qualityScore += 15;
+
+      // Normalize quality (0-1 range)
+      const normalizedQuality = qualityScore / 160; // Max possible is ~160
+
+      // Normalize latency (0-1 range, inverted so lower is better)
+      const normalizedLatency = 1 - model.avgLatency / maxLatency;
+
+      // Weighted score: 60% speed, 40% quality
+      const finalScore = normalizedLatency * 0.6 + normalizedQuality * 0.4;
+
+      return { model, score: finalScore };
+    });
+
+    return scored.reduce((best, current) =>
+      current.score > best.score ? current : best
+    ).model;
+  }
+  //get routing decision
+  explainDecision(selectedModel, strategy) {
+    return {
+      model: selectedModel.name,
+      reason: this.getReasonText(selectedModel, strategy),
+      metrics: {
+        cost: selectedModel.costPer1k,
+        latency: selectedModel.avgLatency,
+      },
+    };
+  }
+  // Consider rate limits in selection
+  selectWithHighestLimit(models) {
+    return models.reduce((best, current) => {
+      const bestRpm = best.rateLimit?.rpm || 0;
+      const currentRpm = current.rateLimit?.rpm || 0;
+      return currentRpm > bestRpm ? current : best;
+    });
+  }
+  getReasonText(model, strategy) {
+    switch (strategy) {
+      case "cost-optimized":
+        return `Selected ${model.name} - free model with fastest response (${model.avgLatency}ms)`;
+      case "performance-optimized":
+        return `Selected ${model.name} for fastest response time (${model.avgLatency}ms)`;
+      case "quality-optimized":
+        const hasThinking = model.capabilities.includes("thinking");
+        const hasReasoning = model.capabilities.includes("reasoning");
+        if (hasThinking) {
+          return `Selected ${model.name} for advanced thinking capabilities`;
+        } else if (hasReasoning) {
+          return `Selected ${model.name} for strong reasoning capabilities`;
+        } else {
+          return `Selected ${model.name} for comprehensive processing (${model.capabilities.length} capabilities)`;
+        }
+      case "balanced":
+      default:
+        return `Selected ${model.name} for best balance of speed (${model.avgLatency}ms) and capabilities`;
+    }
+  }
+}
+
+module.exports = AIRouter;

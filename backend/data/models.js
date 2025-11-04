@@ -1,0 +1,141 @@
+const models = [
+  // OpenRouter - Gemini
+  {
+    id: 1,
+    name: 'Gemini 2.0 Flash',
+    provider: 'Google (OpenRouter)',
+    status: 'active',
+    capabilities: ['text-generation', 'code', 'reasoning'],
+    costPer1k: 0.0,
+    avgLatency: 280,
+    rateLimit: { rpm: 10, tpm: 50000 },  // Typical free tier
+    endpoint: 'https://openrouter.ai/api/v1',
+    model_id: 'google/gemini-2.0-flash-exp:free',
+    apiProvider: 'openrouter'
+  },
+  
+  // Mistral - Codestral
+  {
+    id: 2,
+    name: 'Codestral',
+    provider: 'Mistral',
+    status: 'active',
+    capabilities: ['text-generation', 'code', 'reasoning', 'documentation'],
+    costPer1k: 0.0,
+    avgLatency: 250,
+    rateLimit: { rpm: 60, tpm: 100000 },  // Generous for free
+    endpoint: 'https://codestral.mistral.ai',
+    model_id: 'codestral-latest',
+    apiProvider: 'mistral'
+  },
+  
+  // Cerebras Models (CORRECTED NAMES)
+  {
+    id: 3,
+    name: 'Qwen 235B Thinking',
+    provider: 'Cerebras',
+    status: 'active',
+    capabilities: ['text-generation', 'reasoning', 'analysis', 'thinking'],
+    costPer1k: 0.0,
+    avgLatency: 200,
+    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },  // From screenshot
+    endpoint: 'https://api.cerebras.ai',
+    model_id: 'qwen2.5-32b',
+    apiProvider: 'cerebras'
+  },
+  {
+    id: 4,
+    name: 'Qwen 3 Coder 480B',
+    provider: 'Cerebras',
+    status: 'active',
+    capabilities: ['text-generation', 'code', 'reasoning'],
+    costPer1k: 0.0,
+    avgLatency: 180,
+    rateLimit: { rpm: 10, tpm: 150000, daily: 100 },  // From screenshot
+    endpoint: 'https://api.cerebras.ai',
+    model_id: 'qwen2.5-coder-32b',
+    apiProvider: 'cerebras'
+  },
+  {
+    id: 5,
+    name: 'Llama 4 Maverick',
+    provider: 'Cerebras',
+    status: 'active',
+    capabilities: ['text-generation', 'reasoning'],
+    costPer1k: 0.0,
+    avgLatency: 220,
+    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },  // From screenshot
+    endpoint: 'https://api.cerebras.ai',
+    model_id: 'llama-3.3-70b',
+    apiProvider: 'cerebras'
+  },
+  
+  // Groq Models (CORRECTED - Exact model names from screenshot)
+  {
+    id: 6,
+    name: 'Allam 2 7B',
+    provider: 'Groq',
+    status: 'active',
+    capabilities: ['text-generation', 'multilingual'],
+    costPer1k: 0.0,
+    avgLatency: 150,
+    rateLimit: { rpm: 30, rpd: 7000, tpm: 6000, tpd: 500000 },  // From screenshot
+    endpoint: 'https://api.groq.com',
+    model_id: 'allam-2-7b',
+    apiProvider: 'groq'
+  },
+  {
+    id: 7,
+    name: 'Llama 3.1 8B Instant',
+    provider: 'Groq',
+    status: 'active',
+    capabilities: ['text-generation', 'code'],
+    costPer1k: 0.0,
+    avgLatency: 120,
+    rateLimit: { rpm: 30, rpd: 14400, tpm: 6000, tpd: 500000 },  // From screenshot
+    endpoint: 'https://api.groq.com',
+    model_id: 'llama-3.1-8b-instant',
+    apiProvider: 'groq'
+  },
+  {
+    id: 8,
+    name: 'Llama 4 Scout 17B',
+    provider: 'Groq',
+    status: 'active',
+    capabilities: ['text-generation', 'reasoning', 'analysis'],
+    costPer1k: 0.0,
+    avgLatency: 160,
+    rateLimit: { rpm: 30, rpd: 1000, tpm: 30000, tpd: 500000 },  // From screenshot
+    endpoint: 'https://api.groq.com',
+    model_id: 'meta-llama/llama-4-scout-17b-16e-instruct',
+    apiProvider: 'groq'
+  },
+  {
+    id: 9,
+    name: 'Compound Mini',
+    provider: 'Groq',
+    status: 'active',
+    capabilities: ['text-generation'],
+    costPer1k: 0.0,
+    avgLatency: 100,
+    rateLimit: { rpm: 30, rpd: 250, tpm: 70000, tpd: null },  // From screenshot
+    endpoint: 'https://api.groq.com',
+    model_id: 'groq/compound-mini',
+    apiProvider: 'groq'
+  },
+  {
+    id: 10,
+    name: 'Compound',
+    provider: 'Groq',
+    status: 'active',
+    capabilities: ['text-generation', 'reasoning'],
+    costPer1k: 0.0,
+    avgLatency: 140,
+    rateLimit: { rpm: 30, rpd: 250, tpm: 70000, tpd: null },  // From screenshot
+    endpoint: 'https://api.groq.com',
+    model_id: 'groq/compound',
+    apiProvider: 'groq'
+  }
+]
+
+module.exports = models

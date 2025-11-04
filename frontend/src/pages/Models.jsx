@@ -1,55 +1,53 @@
-import { useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Search, Loader } from 'lucide-react'
 import ModelCard from '../components/ModelCard'
+import { modelsAPI } from '../services/api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 function Models() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [models, setModels] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Mock data 
-  const models = [
-    {
-      id: 1,
-      name: 'GPT-4',
-      provider: 'OpenAI',
-      status: 'active',
-      capabilities: ['text-generation', 'code', 'reasoning'],
-      costPer1k: 0.03,
-      avgLatency: 450
-    },
-    {
-      id: 2,
-      name: 'GPT-3.5-Turbo',
-      provider: 'OpenAI',
-      status: 'active',
-      capabilities: ['text-generation', 'code'],
-      costPer1k: 0.002,
-      avgLatency: 180
-    },
-    {
-      id: 3,
-      name: 'Claude 3 Opus',
-      provider: 'Anthropic',
-      status: 'active',
-      capabilities: ['text-generation', 'reasoning', 'analysis'],
-      costPer1k: 0.015,
-      avgLatency: 320
-    },
-    {
-      id: 4,
-      name: 'Llama 2 7B',
-      provider: 'Meta (Local)',
-      status: 'inactive',
-      capabilities: ['text-generation'],
-      costPer1k: 0,
-      avgLatency: 890
+  // Fetch models when component loads
+  useEffect(() => {
+    fetchModels()
+  }, [])
+
+  const fetchModels = async () => {
+    try {
+      setLoading(true)
+      const response = await modelsAPI.getAll()
+      setModels(response.data)
+      setError('')
+    } catch (err) {
+      console.error('Error fetching models:', err)
+      setError('Failed to load models')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
-  // Filter models
+  // Filter models based on search
   const filteredModels = models.filter(model => 
     model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     model.provider.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  if (loading) {
+      return <LoadingSpinner message="Loading models..." />
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+          {error}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8">

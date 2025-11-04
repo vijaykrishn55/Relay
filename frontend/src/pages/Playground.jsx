@@ -1,5 +1,6 @@
 import {useState} from "react";
 import {Send, Loader, AlertCircle} from "lucide-react";
+import {aiAPI} from "../services/api";
 
 function Playground() {
 
@@ -8,6 +9,7 @@ function Playground() {
   const [ loading, setLoading ] = useState(false);
   const [modelUsed, setModelUsed ] = useState('');
   const [metrics, setMetrics] = useState(null);
+  const [strategy, setStrategy] = useState('balanced');
   const [ error, setError ] = useState('');
 
   const handleSubmit = async (e) => {
@@ -21,16 +23,26 @@ function Playground() {
     setOutput('');
     setMetrics(null);
 
-    setTimeout(()=>{
-      setOutput('This is a simulated response. once we build the backend, real AI responses will appear here!')
-      setModelUsed('GPT-4');
+    try{
+      const response =await aiAPI.process({
+        input: input,
+        strategy: strategy,
+        requiredCapabilities:['text-generation']
+      })
+
+      setOutput(response.data.output)
+      setModelUsed(response.data.model)
       setMetrics({
-        cost: 0.05,
-        latency: 450,
-        tokensUsed: 156
-      });
+        latency:`${response.data.metrics.latency}ms`,
+        cost:`$${response.data.metrics.cost}`,
+        tokensUsed: response.data.metrics.tokensUsed
+      })
+    } catch (err){
+      console.error('Error processing request:', err);
+      setError('Failed to process the request. Please try again.');
+    } finally{
       setLoading(false);
-    }, 1500)
+    }
   }
 
   return (
@@ -40,12 +52,50 @@ function Playground() {
         <h1 className="text-3xl font-bold text-gray-800">Playground</h1>
         <p className="text-gray-600 mt-2">Test AI models with real-time feedback</p>
       </div>
+
+      {/* Multi-Provider Info Banner */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="text-2xl">🚀</div>
+          <div>
+            <p className="font-semibold text-gray-800 mb-1">
+              Multi-Provider AI Router Active
+            </p>
+            <p className="text-sm text-gray-700">
+              <strong>10 FREE models</strong> from 4 providers: 
+              <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">OpenRouter</span>
+              <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Mistral</span>
+              <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Cerebras</span>
+              <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Groq</span>
+            </p>
+            <p className="text-xs text-gray-600 mt-2">
+              ⚡ Rate limits: 10-30 RPM per model • All completely free!
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* input section */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Input</h2>
           <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Routing Strategy</label>
+              <select 
+              value={strategy}
+              onChange={(e)=>{setStrategy(e.target.value)}}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loading}
+              >
+                <option value="balanced">Balanced - Best cost-performance balance</option>
+                <option value="cost-optimized">Cost Optimized - Cheapest model</option>
+                <option value="performance-optimized">Performance Optimized - Fastest model</option>
+                <option value="quality-optimized">Quality Optimized - Best quality</option>
+
+              </select>
+            </div>
             <textarea
               className="w-full border h-64 p-4 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               value={input}
@@ -98,7 +148,15 @@ function Playground() {
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-gray-800 whitespace-pre-wrap">{output}</p>
               </div>
-
+              {/* Routing Decision */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs font-semibold text-blue-700 mb-1">
+                🎯 Why this model?
+              </p>
+              <p className="text-sm text-blue-600">
+                Selected <span className="font-bold">{modelUsed}</span> because it offers the best {strategy.replace('-', ' ')}
+              </p>
+            </div>
               {/* Metrics */}
               {metrics && (
                 <div className="border-t pt-4">
@@ -106,7 +164,7 @@ function Playground() {
                     Request Metrics
                   </h3>
                   
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-blue-50 rounded-lg">
                       <p className="text-xs text-gray-600">Model Used</p>
                       <p className="text-sm font-bold text-gray-800 mt-1">
@@ -123,6 +181,12 @@ function Playground() {
                       <p className="text-xs text-gray-600">Cost</p>
                       <p className="text-sm font-bold text-gray-800 mt-1">
                         {metrics.cost}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-indigo-50 rounded-lg">
+                      <p className="text-xs text-gray-600">Strategy</p>
+                      <p className="text-sm font-bold text-gray-800 mt-1 capitalize">
+                        {strategy.replace('-', ' ')}
                       </p>
                     </div>
                   </div>
