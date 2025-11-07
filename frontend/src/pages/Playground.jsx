@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {Send, Loader, AlertCircle} from "lucide-react";
 import {aiAPI} from "../services/api";
+import ModelDropdown from "../components/ModelDropdown";
 
 function Playground() {
 
@@ -11,6 +12,7 @@ function Playground() {
   const [metrics, setMetrics] = useState(null);
   const [strategy, setStrategy] = useState('balanced');
   const [ error, setError ] = useState('');
+  const [ manual, setManual ] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,13 +25,15 @@ function Playground() {
     setOutput('');
     setMetrics(null);
 
-    try{
+    if(!manual){
+    }
+      try{
       const response =await aiAPI.process({
         input: input,
         strategy: strategy,
         requiredCapabilities:['text-generation']
       })
-
+      
       setOutput(response.data.output)
       setModelUsed(response.data.model)
       setMetrics({
@@ -96,6 +100,8 @@ function Playground() {
 
               </select>
             </div>
+
+            <ModelDropdown />
             <textarea
               className="w-full border h-64 p-4 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               value={input}

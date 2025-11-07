@@ -57,6 +57,10 @@ function Dashboard() {
                         </div>
                 )
         }
+
+        //fetch models 
+        
+
         return (
                 <div className="p-8">
                         {/* header */}
@@ -70,15 +74,13 @@ function Dashboard() {
                                 title="Total Requests"
                                 value={metrics.totalRequests}
                                 icon={Activity}
-                                trend="up"
-                                trendValue="12% from last week"
+                                
                                 />
                                 <MetricCard
                                 title="Average Cost"
                                 value={`$${metrics.avgCost}`}
                                 icon={DollarSign}
-                                trend="down"
-                                trendValue="8% savings"
+                              
                                 />
                                 <MetricCard
                                 title="Average Latency"

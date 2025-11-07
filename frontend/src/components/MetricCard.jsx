@@ -5,13 +5,7 @@ function MetricCard({ title, value, icon:Icon, trend, trendValue}){
                                 <div>
                                         <p className="text-sm text-gray-500 font-medium">{title}</p>
                                         <h3 className="text-2xl font-bold text-gray-800 mt-2">{value}</h3>
-                                        {trend &&(
-                                                <p className={`text-sm mt-2 ${
-                                                        trend ==='up'? 'text-green-600' : 'text-red-600'
-                                                }` }>
-                                                        {trend ==='up' ? '↑' : '↓'} {trendValue}
-                                                </p>
-                                        )}
+                                        
                                 </div>
                         {Icon && (
                                 <div className="bg-blue-50 p-3 rounded-lg">

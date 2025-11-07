@@ -40,25 +40,25 @@ router.post('/process', async (req, res) => {
     // Route to correct provider based on apiProvider field
     let response
     
-    switch (selectedModel.apiProvider) {
+    switch (selectedModel.apiProvider || manual) {
       case 'mistral':
         console.log('Using Mistral Provider')
-        response = await mistralProvider.callModel(selectedModel, input)
+        response = await mistralProvider.callModel(selectedModel || manual, input)
         break
       
       case 'cerebras':
         console.log('Using Cerebras Provider')
-        response = await cerebrasProvider.callModel(selectedModel, input)
+        response = await cerebrasProvider.callModel(selectedModel || manual, input)
         break
       
       case 'groq':
         console.log('Using Groq Provider')
-        response = await groqProvider.callModel(selectedModel, input)
+        response = await groqProvider.callModel(selectedModel || manual, input)
         break
       
       case 'openrouter':
         console.log('Using OpenRouter Provider')
-        response = await openrouterProvider.callModel(selectedModel, input)
+        response = await openrouterProvider.callModel(selectedModel || manual, input)
         break
       
       default:

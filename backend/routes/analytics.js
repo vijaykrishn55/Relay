@@ -7,11 +7,11 @@ let requestHistory = []
 const getDashboardData = () => {
   return {
     metrics: {
-      totalRequests: requestHistory.length || 1247,
+      totalRequests: requestHistory.length || 0,
       avgCost: 0.0,  // All free!
       avgLatency: requestHistory.length > 0 
         ? Math.round(requestHistory.reduce((sum, r) => sum + r.latency, 0) / requestHistory.length)
-        : 342,
+        : 0,
       activeModels: 10  // Updated to 10!
     },
     recentRequests: requestHistory.slice(-5).reverse().map(r => ({
