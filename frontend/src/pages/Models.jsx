@@ -3,12 +3,14 @@ import { Plus, Search, Loader } from 'lucide-react'
 import ModelCard from '../components/ModelCard'
 import { modelsAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import AddModel from '../components/AddModel'
 
 function Models() {
   const [searchQuery, setSearchQuery] = useState('')
   const [models, setModels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isModalOpen, setIsModalOpen]= useState(false)
 
   // Fetch models when component loads
   useEffect(() => {
@@ -29,6 +31,18 @@ function Models() {
     }
   }
 
+    const handleAddModel = async (modelData) => {
+    try {
+     await modelsAPI.create(modelData)
+      console.log('Adding model:', modelData)
+      
+      // Refresh the models list
+      await fetchModels()
+    } catch (err) {
+      console.error('Error adding model:', err)
+      setError('Failed to add model')
+    }
+  }
   // Filter models based on search
   const filteredModels = models.filter(model => 
     model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -61,7 +75,9 @@ function Models() {
             </p>
           </div>
           
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2">
+          <button 
+          onClick={()=> setIsModalOpen(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2" >
             <Plus size={20} />
             Add Model
           </button>
@@ -112,6 +128,12 @@ function Models() {
           ))}
         </div>
       )}
+      {/* add new model */}
+      <AddModel
+      isOpen={isModalOpen}
+      onClose={()=> setIsModalOpen(false)}
+      onSubmit={handleAddModel}
+      />
     </div>
   )
 }

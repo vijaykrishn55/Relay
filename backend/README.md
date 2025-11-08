@@ -10,6 +10,7 @@ Express.js backend API for intelligent AI model routing across multiple provider
   - `@mistralai/mistralai` (for Mistral Codestral)
   - `@cerebras/cerebras_cloud_sdk` (for Cerebras)
   - `groq-sdk` (for Groq)
+  - `cohere-ai` (for Cohere)
 - **dotenv** for environment variables
 - **cors** for cross-origin requests
 
@@ -26,7 +27,9 @@ backend/
 │   ├── aiProvider.js   # OpenRouter integration
 │   ├── mistralProvider.js  # Mistral integration
 │   ├── cerebrasProvider.js # Cerebras integration
-│   └── groqProvider.js     # Groq integration
+│   ├── groqProvider.js     # Groq integration
+│   ├── cohereProvider.js   # Cohere integration
+│   └── genericProvider.js  # Custom provider support
 ├── data/
 │   └── models.js       # Model configurations
 ├── server.js           # Express server setup
@@ -51,6 +54,7 @@ OPENROUTER_API_KEY=your_openrouter_key
 MISTRAL_API_KEY=your_mistral_key
 CEREBRAS_API_KEY=your_cerebras_key
 GROQ_API_KEY=your_groq_key
+COHERE_API_KEY=your_cohere_key
 ```
 
 ### Run Development Server
@@ -71,7 +75,7 @@ npm start
 ```
 GET    /api/models           # Get all models
 GET    /api/models/:id       # Get model by ID
-POST   /api/models           # Add new model (coming soon)
+POST   /api/models           # Add new model
 ```
 
 ### AI Processing
@@ -79,12 +83,20 @@ POST   /api/models           # Add new model (coming soon)
 POST   /api/ai/process       # Process AI request
 ```
 
-**Request Body:**
+**Request Body (Auto Mode):**
 ```json
 {
   "input": "Your prompt here",
   "strategy": "balanced",
   "requiredCapabilities": ["text-generation"]
+}
+```
+
+**Request Body (Manual Mode):**
+```json
+{
+  "input": "Your prompt here",
+  "modelId": 3
 }
 ```
 
@@ -170,6 +182,16 @@ Models scored by capability quality:
 - Fastest inference (100-160ms)
 - 5 different models
 - Best for performance-critical tasks
+
+### Cohere Provider (`cohereProvider.js`)
+- Advanced reasoning capabilities
+- Multilingual support
+- Command R and Command R+ models
+
+### Generic Provider (`genericProvider.js`)
+- Supports custom OpenAI-compatible APIs
+- Used as fallback for unknown providers
+- REST API only (no SDK required)
 
 ## 📊 Model Configuration
 

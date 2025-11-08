@@ -135,6 +135,34 @@ const models = [
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound',
     apiProvider: 'groq'
+  },
+  
+  // Cohere Models
+  {
+    id: 11,
+    name: 'Command R+',
+    provider: 'Cohere',
+    status: 'active',
+    capabilities: ['text-generation', 'reasoning', 'multilingual'],
+    costPer1k: 0.0,
+    avgLatency: 300,
+    rateLimit: { rpm: 20, tpm: 40000 },  // Trial tier limits
+    endpoint: 'https://api.cohere.ai',
+    model_id: 'command-r-plus',
+    apiProvider: 'cohere'
+  },
+  {
+    id: 12,
+    name: 'Command R',
+    provider: 'Cohere',
+    status: 'active',
+    capabilities: ['text-generation', 'reasoning'],
+    costPer1k: 0.0,
+    avgLatency: 250,
+    rateLimit: { rpm: 20, tpm: 40000 },
+    endpoint: 'https://api.cohere.ai',
+    model_id: 'command-r',
+    apiProvider: 'cohere'
   }
 ]
 

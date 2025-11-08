@@ -16,7 +16,7 @@ const aiRoutes= require('./routes/ai');
 //use routes
 app.use('/api/models', modelsRoutes);
 app.use('/api/analytics',analyticsRoutes);
-app.use('/api/ai/', aiRoutes)
+app.use('/api/ai', aiRoutes)
 
 //health check
 app.get('/', (req, res) => {

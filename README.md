@@ -4,11 +4,11 @@ A browser-based platform that intelligently routes AI requests across multiple p
 
 ## 🚀 Features
 
-- **Multi-Provider Support** - 10 free AI models from 4 providers (OpenRouter, Mistral, Cerebras, Groq)
-- **Intelligent Routing** - 4 strategies: Balanced, Cost-Optimized, Performance-Optimized, Quality-Optimized
+- **Multi-Provider Support** - 12 AI models from 5 providers (OpenRouter, Mistral, Cerebras, Groq, Cohere)
+- **Intelligent Routing** - Auto mode with 4 strategies or Manual model selection
 - **Smart Capability Detection** - Automatically detects if you need code, reasoning, thinking, or analysis
 - **Real-time Analytics** - Dashboard with metrics and request tracking
-- **Zero Cost** - All models are completely free to use
+- **Add Custom Models** - Support for custom AI providers with OpenAI-compatible APIs
 
 ## 📊 Providers & Models
 
@@ -16,6 +16,7 @@ A browser-based platform that intelligently routes AI requests across multiple p
 |----------|--------|----------------|
 | **Groq** | 5 models | Ultra-fast inference (100-160ms) |
 | **Cerebras** | 3 models | Thinking & reasoning tasks |
+| **Cohere** | 2 models | Advanced reasoning & multilingual |
 | **Mistral** | 1 model | Code generation (Codestral) |
 | **OpenRouter** | 1 model | Gemini 2.0 Flash |
 
@@ -31,7 +32,7 @@ A browser-based platform that intelligently routes AI requests across multiple p
 
 **Backend:**
 - Node.js + Express
-- Multiple AI SDKs (@mistralai, groq-sdk, cerebras, openai)
+- Multiple AI SDKs (@mistralai, groq-sdk, cerebras, openai, cohere-ai)
 - In-memory analytics
 
 ## 📁 Project Structure
@@ -52,6 +53,7 @@ Distributed AI OS/
   - Mistral (https://console.mistral.ai)
   - Cerebras (https://cerebras.ai)
   - Groq (https://console.groq.com)
+  - Cohere (https://dashboard.cohere.com)
 
 ### Installation
 
@@ -74,6 +76,7 @@ OPENROUTER_API_KEY=your_key_here
 MISTRAL_API_KEY=your_key_here
 CEREBRAS_API_KEY=your_key_here
 GROQ_API_KEY=your_key_here
+COHERE_API_KEY=your_key_here
 ```
 
 Start backend:
@@ -107,8 +110,8 @@ npm run dev
 ## 📱 Pages
 
 - **Dashboard** - System overview, metrics, recent requests
-- **Playground** - Interactive AI testing with strategy selector
-- **Models** - View all 10 models, their capabilities, and rate limits
+- **Playground** - Interactive AI testing with strategy selector or manual model selection
+- **Models** - View all models, their capabilities, and add custom models
 
 ## 🔥 Key Capabilities
 
@@ -121,15 +124,15 @@ npm run dev
 
 - **Rate Limit Aware** - Tracks and displays per-model rate limits
 
-## 📈 Future Enhancements
+## 📈 Features
 
+- ✅ Manual model selection
+- ✅ Add custom models (OpenAI-compatible APIs)
+- ✅ 5 providers with 12 models
 - [ ] User authentication
 - [ ] Request history export
-- [ ] Cost tracking dashboard
 - [ ] Model comparison tool
 - [ ] Streaming responses
-- [ ] File upload support
-- [ ] Custom routing strategies
 
 
 ## 👨‍💻 Author

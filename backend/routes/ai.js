@@ -6,6 +6,8 @@ const AIProvider = require('../services/aiProvider')
 const MistralProvider = require('../services/mistralProvider')
 const CerebrasProvider = require('../services/cerebrasProvider')
 const GroqProvider = require('../services/groqProvider')
+const CohereProvider = require('../services/cohereProvider')
+const CustomProvider = require('../services/genericProvider')
 
 const models = require('../data/models')
 
@@ -14,57 +16,91 @@ const openrouterProvider = new AIProvider()
 const mistralProvider = new MistralProvider()
 const cerebrasProvider = new CerebrasProvider()
 const groqProvider = new GroqProvider()
+const cohereProvider = new CohereProvider()
+const customProvider= new CustomProvider()
 
 router.post('/process', async (req, res) => {
   try {
-    const { input, strategy, requiredCapabilities } = req.body
+    const { input, strategy, requiredCapabilities, modelId } = req.body
 
     if (!input || input.trim() === '') {
       return res.status(400).json({ error: 'Input is required' })
     }
 
-    // Initialize router
-    const aiRouter = new AIRouter(models)
+    let selectedModel
+    let decision
 
-    // Select best model
-    const selectedModel = aiRouter.selectModel({
+    if (modelId) {
+      // Manual model selection
+      selectedModel = models.find(m => m.id === modelId)
+      
+      if (!selectedModel) { // Fixed: was 'selectedManual'
+        return res.status(404).json({ error: "Model not found" })
+      }
+      
+      decision = {
+        reason: 'Manual model selection by user',
+        mode: 'manual' // Fixed: was 'model'
+      }
+      console.log(`👤 Manual selection: ${selectedModel.name}`)
+      
+    } else {
+      // Automatic router selection
+      const aiRouter = new AIRouter(models)
+      
+      // Select best model
+      selectedModel = aiRouter.selectModel({
         strategy: strategy || 'balanced',
         requiredCapabilities: requiredCapabilities || ['text-generation'],
-        input: input  // Pass input for intent analysis
-        })
+        input: input
+      })
+      
+      // Get decision explanation
+      decision = aiRouter.explainDecision(selectedModel, strategy || 'balanced')
+      decision.mode = 'auto'
+      console.log(`🎯 Selected model: ${selectedModel.name} (${decision.reason})`)
+    }
 
-    // Get decision explanation
-    const decision = aiRouter.explainDecision(selectedModel, strategy || 'balanced')
-    console.log(`🎯 Selected model: ${selectedModel.name} (${decision.reason})`)
+    // Validate selectedModel exists
+    if (!selectedModel) {
+      return res.status(503).json({ error: 'No suitable model available' })
+    }
 
     // Route to correct provider based on apiProvider field
     let response
     
-    switch (selectedModel.apiProvider || manual) {
+    switch (selectedModel.apiProvider) {
       case 'mistral':
         console.log('Using Mistral Provider')
-        response = await mistralProvider.callModel(selectedModel || manual, input)
+        response = await mistralProvider.callModel(selectedModel, input)
         break
       
       case 'cerebras':
         console.log('Using Cerebras Provider')
-        response = await cerebrasProvider.callModel(selectedModel || manual, input)
+        response = await cerebrasProvider.callModel(selectedModel, input)
         break
       
       case 'groq':
         console.log('Using Groq Provider')
-        response = await groqProvider.callModel(selectedModel || manual, input)
+        response = await groqProvider.callModel(selectedModel, input)
         break
       
       case 'openrouter':
         console.log('Using OpenRouter Provider')
-        response = await openrouterProvider.callModel(selectedModel || manual, input)
+        response = await openrouterProvider.callModel(selectedModel, input)
+        break
+      
+      case 'cohere':
+        console.log('Using Cohere Provider')
+        response = await cohereProvider.callModel(selectedModel, input)
         break
       
       default:
-        throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
+        console.log(`Using Custom Provider: ${selectedModel.apiProvider}`)
+        response = await customProvider.callModel(selectedModel, input)
+        break
     }
-
+    
     res.json({
       success: true,
       input,

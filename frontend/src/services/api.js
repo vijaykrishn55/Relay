@@ -13,7 +13,8 @@ const api = axios.create({
 // API endpoints
 export const modelsAPI = {
   getAll: () => api.get('/models'),
-  getById: (id) => api.get(`/models/${id}`)
+  getById: (id) => api.get(`/models/${id}`),
+  create:(data)=> api.post('/models',data)
 }
 
 export const analyticsAPI = {

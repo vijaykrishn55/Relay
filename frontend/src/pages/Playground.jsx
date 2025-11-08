@@ -12,7 +12,7 @@ function Playground() {
   const [metrics, setMetrics] = useState(null);
   const [strategy, setStrategy] = useState('balanced');
   const [ error, setError ] = useState('');
-  const [ manual, setManual ] = useState('');
+  const [manual, setManual] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,21 +25,29 @@ function Playground() {
     setOutput('');
     setMetrics(null);
 
-    if(!manual){
-    }
       try{
-      const response =await aiAPI.process({
+      const requestData ={
         input: input,
-        strategy: strategy,
         requiredCapabilities:['text-generation']
-      })
+      };
       
+      if(manual){
+        requestData.modelId= parseInt(manual);
+      }else{
+        requestData.strategy=strategy;
+      }
+
+      const response = await aiAPI.process(requestData);
+
       setOutput(response.data.output)
       setModelUsed(response.data.model)
       setMetrics({
         latency:`${response.data.metrics.latency}ms`,
         cost:`$${response.data.metrics.cost}`,
-        tokensUsed: response.data.metrics.tokensUsed
+        tokensUsed: response.data.metrics.tokensUsed,
+        mode:response.data.decision.mode,
+        reason:response.data.decision.reason,
+        usedStrategy: manual? 'manual': strategy
       })
     } catch (err){
       console.error('Error processing request:', err);
@@ -66,14 +74,15 @@ function Playground() {
               Multi-Provider AI Router Active
             </p>
             <p className="text-sm text-gray-700">
-              <strong>10 FREE models</strong> from 4 providers: 
+              <strong>12 models</strong> from 5 providers: 
               <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">OpenRouter</span>
               <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Mistral</span>
               <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Cerebras</span>
               <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Groq</span>
+              <span className="ml-1 px-2 py-0.5 bg-white rounded text-xs">Cohere</span>
             </p>
             <p className="text-xs text-gray-600 mt-2">
-              ⚡ Rate limits: 10-30 RPM per model • All completely free!
+              ⚡ Rate limits: 10-60 RPM per model
             </p>
           </div>
         </div>
@@ -101,7 +110,11 @@ function Playground() {
               </select>
             </div>
 
-            <ModelDropdown />
+            <ModelDropdown 
+            value={manual}
+            onChange={setManual}
+            disabled={loading}
+            />
             <textarea
               className="w-full border h-64 p-4 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               value={input}
@@ -157,10 +170,14 @@ function Playground() {
               {/* Routing Decision */}
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-xs font-semibold text-blue-700 mb-1">
-                🎯 Why this model?
+                🎯{metrics.mode === 'manual'? 'Manual selection': ' Why this model?'}
               </p>
               <p className="text-sm text-blue-600">
-                Selected <span className="font-bold">{modelUsed}</span> because it offers the best {strategy.replace('-', ' ')}
+                { metrics.mode === 'manual'? (
+                  <>Used your manually selected model: <span className="frt">{modelUsed}</span></>
+                ): (
+                  <>Selected <span className="font-bold">{modelUsed}</span> because {metrics.reason}</>
+                )}
               </p>
             </div>
               {/* Metrics */}
@@ -192,7 +209,7 @@ function Playground() {
                     <div className="text-center p-3 bg-indigo-50 rounded-lg">
                       <p className="text-xs text-gray-600">Strategy</p>
                       <p className="text-sm font-bold text-gray-800 mt-1 capitalize">
-                        {strategy.replace('-', ' ')}
+                        {metrics.usedStrategy.replace('-', ' ')}
                       </p>
                     </div>
                   </div>

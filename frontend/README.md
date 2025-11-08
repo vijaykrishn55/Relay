@@ -1,13 +1,13 @@
 # Distributed AI OS - Frontend
 
-A React-based dashboard for managing and monitoring distributed AI model routing.
+React-based interface for intelligent AI model routing across multiple providers.
 
 ## 🚀 Features
 
 - **Dashboard** - Real-time metrics and request monitoring
-- **Playground** - Interactive AI model testing interface
-- **Model Registry** - Manage and configure AI models
-- **Responsive Design** - Works on desktop, tablet, and mobile
+- **Playground** - Interactive AI testing with auto/manual mode
+- **Models** - View and add AI models
+- **Responsive Design** - Clean, modern UI with Tailwind CSS
 
 ## 🛠️ Tech Stack
 
@@ -19,34 +19,38 @@ A React-based dashboard for managing and monitoring distributed AI model routing
 - **Recharts** - Data visualization
 - **Lucide React** - Icons
 
-## 📦 Installation
+## 📦 Setup
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
+```
 
-# Build for production
+Runs on `http://localhost:5173`
+
+Production build:
+```bash
 npm run build
 ```
 
-## 🌐 Development
-
-The app runs on `http://localhost:5173`
-
-## 📁 Project Structure
+## 📁 Structure
 
 ```
 src/
-├── components/     # Reusable UI components
-├── pages/          # Page components (Dashboard, Playground, Models)
-├── services/       # API service calls
-├── hooks/          # Custom React hooks
-└── utils/          # Helper functions
+├── components/
+│   ├── AddModel.jsx        # Add new model modal
+│   ├── ModelDropdown.jsx   # Model selector
+│   ├── ModelCard.jsx       # Model display card
+│   └── ...
+├── pages/
+│   ├── Dashboard.jsx       # Analytics dashboard
+│   ├── Playground.jsx      # AI testing interface
+│   └── Models.jsx          # Model management
+├── services/
+│   └── api.js              # API calls
+└── App.jsx
 ```
 
-## 🔗 API Connection
+## 🔗 Backend Connection
 
-The frontend connects to the backend API at `http://localhost:3000` (configured in development).
+Connects to backend API at `http://localhost:5000`
