@@ -19,7 +19,7 @@ class GroqProvider {
         'Compound Mini': 'groq/compound-mini',
         'Compound': 'groq/compound'
       }
-
+      
       const groqModel = modelMap[model.name] || 'groq/compound-mini'
 
       console.log(`📡 Calling Groq model: ${groqModel}`)

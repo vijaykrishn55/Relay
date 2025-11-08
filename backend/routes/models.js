@@ -1,13 +1,15 @@
 const express = require('express')
 const router = express.Router()
 const models = require('../data/models')
+const { updateModelStatuses, checkApiKey } = require('../utils/apiKeyValidator')
 
-// GET all models
+// GET all models with updated statuses
 router.get('/', (req, res) => {
-  res.json(models)
+  const modelsWithStatus = updateModelStatuses(models)
+  res.json(modelsWithStatus)
 })
 
-// GET single model by ID
+// GET single model by ID with status check
 router.get('/:id', (req, res) => {
   const model = models.find(m => m.id === parseInt(req.params.id))
   
@@ -15,22 +17,27 @@ router.get('/:id', (req, res) => {
     return res.status(404).json({ error: 'Model not found' })
   }
   
-  res.json(model)
+  // Check API key and update status
+  const keyCheck = checkApiKey(model.apiProvider)
+  const modelWithStatus = {
+    ...model,
+    status: keyCheck.available ? 'active' : 'unavailable',
+    statusReason: keyCheck.reason
+  }
+  
+  res.json(modelWithStatus)
 })
 
-// POST new model (we'll implement later)
+// POST new model with API key validation
 router.post('/', (req, res) => {
   try {
     const newModel = {
-      // Auto-generated fields
       id: models.length + 1,
-      model_id: req.body.name.toLowerCase().replace(/\s+/g, '-'), // Auto-generate from name
-      status: 'active',
-      avgLatency: 200, // Default value
+      model_id: req.body.name.toLowerCase().replace(/\s+/g, '-'),
+      avgLatency: 200,
       costPer1k: req.body.pricing?.input || 0,
-      rateLimit: { rpm: 30, tpm: 60000 }, // Default rate limits
+      rateLimit: { rpm: 30, tpm: 60000 },
       
-      // User-provided fields
       name: req.body.name,
       provider: req.body.provider,
       endpoint: req.body.endpoint,
@@ -39,32 +46,45 @@ router.post('/', (req, res) => {
       pricing: req.body.pricing
     }
 
-      // custom apikey
-      if (req.body.apikey && req.body.apiProvider){
-        const envKey =`${req.body.apiProvider.toUpperCase()}_API_KEY`
-
-        process.env[envKey]= req.body.apiKey
-
-        const fs = require('fs')
+    // If custom API key is provided, save it to .env
+    if (req.body.apiKey && req.body.apiProvider) {
+      const envKey = `${req.body.apiProvider.toUpperCase()}_API_KEY`
+      
+      // Update environment variable
+      process.env[envKey] = req.body.apiKey
+      
+      // Write to .env file for persistence
+      const fs = require('fs')
       const path = require('path')
       const envPath = path.join(__dirname, '../.env')
       
-      // Read existing .env
-      let envContent = fs.readFileSync(envPath, 'utf8')
-      
-      // Check if key exists
-      const keyRegex = new RegExp(`^${envKey}=.*$`, 'm')
-      if (keyRegex.test(envContent)) {
-        // Update existing key
-        envContent = envContent.replace(keyRegex, `${envKey}=${req.body.apiKey}`)
-      } else {
-        // Add new key
-        envContent += `\n${envKey}=${req.body.apiKey}`
+      try {
+        // Read existing .env
+        let envContent = fs.readFileSync(envPath, 'utf8')
+        
+        // Check if key exists
+        const keyRegex = new RegExp(`^${envKey}=.*$`, 'm')
+        if (keyRegex.test(envContent)) {
+          // Update existing key
+          envContent = envContent.replace(keyRegex, `${envKey}=${req.body.apiKey}`)
+        } else {
+          // Add new key
+          envContent += `\n${envKey}=${req.body.apiKey}`
+        }
+        
+        // Write back to .env
+        fs.writeFileSync(envPath, envContent)
+      } catch (fsError) {
+        console.error('Error writing to .env:', fsError)
+        // Continue anyway - key is in memory
       }
-      
-      // Write back to .env
-      fs.writeFileSync(envPath, envContent)
-      }
+    }
+
+    // Check API key status
+    const keyCheck = checkApiKey(newModel.apiProvider)
+    newModel.status = keyCheck.available ? 'active' : 'unavailable'
+    newModel.statusReason = keyCheck.reason
+
     models.push(newModel)
     res.status(201).json(newModel)
     

@@ -32,30 +32,53 @@ router.post('/process', async (req, res) => {
 
     if (modelId) {
       // Manual model selection
-      selectedModel = models.find(m => m.id === modelId)
+      selectedModel = models.find(m => m.id === parseInt(modelId, 10))
       
-      if (!selectedModel) { // Fixed: was 'selectedManual'
+      if (!selectedModel) {
         return res.status(404).json({ error: "Model not found" })
+      }
+      
+      // Check if API key is available
+      const { checkApiKey } = require('../utils/apiKeyValidator')
+      const keyCheck = checkApiKey(selectedModel.apiProvider)
+      
+      if (!keyCheck.available) {
+        return res.status(503).json({ 
+          error: 'Model unavailable', 
+          details: keyCheck.reason,
+          model: selectedModel.name
+        })
       }
       
       decision = {
         reason: 'Manual model selection by user',
-        mode: 'manual' // Fixed: was 'model'
+        mode: 'manual'
       }
       console.log(`👤 Manual selection: ${selectedModel.name}`)
       
     } else {
       // Automatic router selection
-      const aiRouter = new AIRouter(models)
+      const AIRouter = require('../services/router')
+      const { updateModelStatuses } = require('../utils/apiKeyValidator')
       
-      // Select best model
+      // Filter only available models
+      const availableModels = updateModelStatuses(models).filter(m => m.status === 'active')
+      
+      if (availableModels.length === 0) {
+        return res.status(503).json({ 
+          error: 'No models available', 
+          details: 'No API keys configured'
+        })
+      }
+      
+      const aiRouter = new AIRouter(availableModels)
+      
       selectedModel = aiRouter.selectModel({
         strategy: strategy || 'balanced',
         requiredCapabilities: requiredCapabilities || ['text-generation'],
         input: input
       })
       
-      // Get decision explanation
       decision = aiRouter.explainDecision(selectedModel, strategy || 'balanced')
       decision.mode = 'auto'
       console.log(`🎯 Selected model: ${selectedModel.name} (${decision.reason})`)
@@ -66,7 +89,7 @@ router.post('/process', async (req, res) => {
       return res.status(503).json({ error: 'No suitable model available' })
     }
 
-    // Route to correct provider based on apiProvider field
+    // Route to correct provider
     let response
     
     switch (selectedModel.apiProvider) {
@@ -100,7 +123,7 @@ router.post('/process', async (req, res) => {
         response = await customProvider.callModel(selectedModel, input)
         break
     }
-    
+
     res.json({
       success: true,
       input,
