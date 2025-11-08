@@ -188,21 +188,23 @@ function AddModelModal({ isOpen, onClose, onSubmit }) {
   </>
 )}
 
-        {/* Endpoint */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Endpoint URL *
-          </label>
-          <input
-            type="url"
-            name="endpoint"
-            value={formData.endpoint}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="e.g., https://api.groq.com"
-          />
-        </div>
+        {/* Endpoint - Only show if NOT custom provider */}
+        {!showCustomProvider && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Endpoint URL *
+            </label>
+            <input
+              type="url"
+              name="endpoint"
+              value={formData.endpoint}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="e.g., https://api.groq.com"
+            />
+          </div>
+        )}
 
         {/* Capabilities */}
         <div>
