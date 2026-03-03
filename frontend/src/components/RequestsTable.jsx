@@ -2,7 +2,7 @@ function RequestsTable({ requests }) {
   if (!requests || requests.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow p-8 text-center">
-        <p className="text-gray-500">No requests yet. Try the Playground!</p>
+        <p className="text-gray-500">No requests yet. Start a chat!</p>
       </div>
     );
   }

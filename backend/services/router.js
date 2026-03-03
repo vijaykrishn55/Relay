@@ -1,11 +1,12 @@
+const AIRouterService = require("./aiRouterService");
+
 class AIRouter {
   constructor(models) {
     this.models = models;
   }
-  // Analyze input to determine required capabilities
   analyzeInput(input) {
     const inputLower = input.toLowerCase();
-    const detectedCapabilities = ["text-generation"]; // Always needed
+    const detectedCapabilities = ['text-generation'];
 
     // Reasoning/Logic detection
     const reasoningKeywords = [
@@ -15,7 +16,8 @@ class AIRouter {
       "reasoning",
       "think",
       "analyze",
-      "explain why",
+      "explain",
+      //" why",
       "deduce",
       "infer",
       "conclude",
@@ -69,7 +71,6 @@ class AIRouter {
     );
     return detectedCapabilities;
   }
-  // Analyze input to detect intent
   analyzeIntent(input) {
     const inputLower = input.toLowerCase();
     const hints = [];
@@ -108,48 +109,50 @@ class AIRouter {
 
     return hints;
   }
-  //main routing logic
- selectModel(request) {
-  const { strategy = 'balanced', requiredCapabilities = [], input = '' } = request
+  async selectModel(request) {
+    let { strategy = 'balanced', requiredCapabilities = [], input = '' } = request
   
-  // Analyze input for hints
-  const hints = this.analyzeIntent(input)
-  
-  // Merge hints with required capabilities
-  const allRequiredCapabilities = [...new Set([...requiredCapabilities, ...hints])]
-  
-  console.log(`🔍 Detected capabilities needed: ${allRequiredCapabilities.join(', ') || 'none'}`)
-  
-  // Filter models by capabilities and active status
-  let eligibleModels = this.models.filter(model =>
+    if (strategy === 'ai-powered') {
+      const aiRouter = new AIRouterService();
+      const decision = await aiRouter.routeQuestion(input, this.models);
+      const selectedModel = this.models.find(m => m.id === decision.modelId);
+      
+      if (!selectedModel) {
+        console.log('⚠️ AI Router invalid model, fallback to balanced');
+        strategy = 'balanced';
+      } else {
+        console.log(`✅ AI-powered routing: ${selectedModel.name}`);
+        return selectedModel;
+      }
+    }
+    const hints = this.analyzeIntent(input)
+    const allRequiredCapabilities = [...new Set([...requiredCapabilities, ...hints])]
+
+    console.log(`🔍 Capabilities needed: ${allRequiredCapabilities.join(', ') || 'none'}`)
+
+    let eligibleModels = this.models.filter(model =>
     model.status === 'active' &&
     allRequiredCapabilities.every(cap => model.capabilities.includes(cap))
   )
   
-  if (eligibleModels.length === 0) {
-    console.log('⚠️ No models match all requirements, relaxing constraints...')
-    // Fallback: just check active status
-    eligibleModels = this.models.filter(model => model.status === 'active')
-  }
+    if (eligibleModels.length === 0) {
+      console.log('⚠️ No models match requirements, relaxing constraints...')
+      eligibleModels = this.models.filter(model => model.status === 'active')
+    }
   
-  // Apply routing strategy
-  switch (strategy) {
-    case 'cost-optimized':
-      return this.selectByCost(eligibleModels)
-    
-    case 'performance-optimized':
-      return this.selectByLatency(eligibleModels)
-    
-    case 'quality-optimized':
-      return this.selectByQuality(eligibleModels)
-    
-    case 'balanced':
-    default:
-      return this.selectBalanced(eligibleModels)
+    switch (strategy) {
+      case 'cost-optimized':
+        return this.selectByCost(eligibleModels)
+      case 'performance-optimized':
+        return this.selectByLatency(eligibleModels)
+      case 'quality-optimized':
+        return this.selectByQuality(eligibleModels)
+      case 'balanced':
+      default:
+        return this.selectBalanced(eligibleModels)
+    }
   }
-}
 
-  // strategy : choose cheapest model (if tied, pick fastest)
   selectByCost(models) {
     return models.reduce((cheapest, current) => {
       // If costs are equal, pick the one with lower latency
@@ -159,31 +162,23 @@ class AIRouter {
       return current.costPer1k < cheapest.costPer1k ? current : cheapest;
     });
   }
-  //for fastest model
   selectByLatency(models) {
     return models.reduce((fastest, current) =>
       current.avgLatency < fastest.avgLatency ? current : fastest
     );
   }
 
-  // For highest quality model - prioritize reasoning and thinking capabilities
   selectByQuality(models) {
     return models.reduce((best, current) => {
-      // Calculate quality score based on capability types
       const calculateQualityScore = (model) => {
         let score = 0;
-
-        // High-value capabilities (weighted scoring)
-        if (model.capabilities.includes("thinking")) score += 100;
-        if (model.capabilities.includes("reasoning")) score += 80;
-        if (model.capabilities.includes("analysis")) score += 70;
-        if (model.capabilities.includes("code")) score += 50;
-        if (model.capabilities.includes("documentation")) score += 40;
-        if (model.capabilities.includes("text-generation")) score += 20;
-
-        // Add latency as tiebreaker (higher latency = more thorough)
+        if (model.capabilities.includes('thinking')) score += 100;
+        if (model.capabilities.includes('reasoning')) score += 80;
+        if (model.capabilities.includes('analysis')) score += 70;
+        if (model.capabilities.includes('code')) score += 50;
+        if (model.capabilities.includes('documentation')) score += 40;
+        if (model.capabilities.includes('text-generation')) score += 20;
         score += model.avgLatency * 0.1;
-
         return score;
       };
 
@@ -193,26 +188,19 @@ class AIRouter {
       return currentScore > bestScore ? current : best;
     });
   }
-  // Balanced selection - considers speed, capabilities quality, and diversity
   selectBalanced(models) {
     const maxLatency = Math.max(...models.map((m) => m.avgLatency));
 
     const scored = models.map((model) => {
-      // Quality score based on capability types
       let qualityScore = 0;
-      if (model.capabilities.includes("thinking")) qualityScore += 50;
-      if (model.capabilities.includes("reasoning")) qualityScore += 40;
-      if (model.capabilities.includes("analysis")) qualityScore += 30;
-      if (model.capabilities.includes("code")) qualityScore += 25;
-      if (model.capabilities.includes("documentation")) qualityScore += 15;
+      if (model.capabilities.includes('thinking')) qualityScore += 50;
+      if (model.capabilities.includes('reasoning')) qualityScore += 40;
+      if (model.capabilities.includes('analysis')) qualityScore += 30;
+      if (model.capabilities.includes('code')) qualityScore += 25;
+      if (model.capabilities.includes('documentation')) qualityScore += 15;
 
-      // Normalize quality (0-1 range)
-      const normalizedQuality = qualityScore / 160; // Max possible is ~160
-
-      // Normalize latency (0-1 range, inverted so lower is better)
+      const normalizedQuality = qualityScore / 160;
       const normalizedLatency = 1 - model.avgLatency / maxLatency;
-
-      // Weighted score: 60% speed, 40% quality
       const finalScore = normalizedLatency * 0.6 + normalizedQuality * 0.4;
 
       return { model, score: finalScore };
@@ -222,7 +210,6 @@ class AIRouter {
       current.score > best.score ? current : best
     ).model;
   }
-  //get routing decision
   explainDecision(selectedModel, strategy) {
     return {
       model: selectedModel.name,
@@ -233,7 +220,6 @@ class AIRouter {
       },
     };
   }
-  // Consider rate limits in selection
   selectWithHighestLimit(models) {
     return models.reduce((best, current) => {
       const bestRpm = best.rateLimit?.rpm || 0;

@@ -13,12 +13,12 @@ class CerebrasProvider {
 
       // Map our model names to Cerebras model IDs
       const modelMap = {
-        'Qwen 3 235B Thinking': 'qwen2.5-32b',
-        'Qwen 3 Coder 480B': 'qwen2.5-coder-32b',
-        'Llama 4 Maverick': 'llama-3.3-70b'
+        'Z.AI GLM 4.7': 'zai-glm-4.7',
+        'OpenAI GPT OSS': 'gpt-oss-120b',
+        'Llama 3.1 8B': 'llama3.1-8b'
       }
 
-      const cerebrasModel = modelMap[model.name] || 'llama-3.3-70b'
+      const cerebrasModel = modelMap[model.name] || 'llama3.1-8b'
 
       console.log(`📡 Calling Cerebras model: ${cerebrasModel}`)
       console.log(`📝 Input: ${input.substring(0, 50)}...`)

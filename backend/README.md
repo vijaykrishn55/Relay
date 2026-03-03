@@ -1,16 +1,15 @@
-# Distributed AI OS - Backend
+# Relay — Backend
 
-Express.js backend API for intelligent AI model routing across multiple providers.
+Express.js backend API for AI-powered model routing across multiple providers.
 
 ## 🛠️ Tech Stack
 
 - **Node.js** with Express
-- **Multiple AI SDKs**:
-  - `openai` (for OpenRouter)
-  - `@mistralai/mistralai` (for Mistral Codestral)
-  - `@cerebras/cerebras_cloud_sdk` (for Cerebras)
-  - `groq-sdk` (for Groq)
-  - `cohere-ai` (for Cohere)
+- **AI SDKs**:
+  - `@mistralai/mistralai` — Mistral Codestral
+  - `@cerebras/cerebras_cloud_sdk` — Cerebras models
+  - `groq-sdk` — Groq models (also used as meta-router)
+  - `cohere-ai` — Cohere models (reserved for future use)
 - **dotenv** for environment variables
 - **cors** for cross-origin requests
 
@@ -19,21 +18,20 @@ Express.js backend API for intelligent AI model routing across multiple provider
 ```
 backend/
 ├── routes/
-│   ├── ai.js           # AI request processing
-│   ├── models.js       # Model management
-│   └── analytics.js    # Analytics & metrics
+│   ├── ai.js               # AI request processing
+│   ├── models.js           # Model management & API key validation
+│   └── analytics.js        # Request metrics & dashboard data
 ├── services/
-│   ├── router.js       # Intelligent routing logic
-│   ├── aiProvider.js   # OpenRouter integration
+│   ├── router.js           # Routing logic (ai-powered + fallback strategies)
+│   ├── aiRouterService.js  # AI meta-router using Compound Mini
 │   ├── mistralProvider.js  # Mistral integration
 │   ├── cerebrasProvider.js # Cerebras integration
 │   ├── groqProvider.js     # Groq integration
-│   ├── cohereProvider.js   # Cohere integration
-│   └── genericProvider.js  # Custom provider support
+│   └── cohereProvider.js   # Cohere integration (future)
 ├── data/
-│   └── models.js       # Model configurations
-├── server.js           # Express server setup
-└── .env               # API keys (not in git)
+│   └── models.js           # Model registry (9 active + 2 Cohere)
+├── server.js               # Express server setup
+└── .env                    # API keys (not in git)
 ```
 
 ## 🚀 Getting Started
@@ -50,7 +48,6 @@ Create `.env` file:
 PORT=5000
 
 # API Keys
-OPENROUTER_API_KEY=your_openrouter_key
 MISTRAL_API_KEY=your_mistral_key
 CEREBRAS_API_KEY=your_cerebras_key
 GROQ_API_KEY=your_groq_key
@@ -83,22 +80,16 @@ POST   /api/models           # Add new model
 POST   /api/ai/process       # Process AI request
 ```
 
-**Request Body (Auto Mode):**
+**Request Body:**
 ```json
 {
   "input": "Your prompt here",
-  "strategy": "balanced",
+  "strategy": "ai-powered",
   "requiredCapabilities": ["text-generation"]
 }
 ```
 
-**Request Body (Manual Mode):**
-```json
-{
-  "input": "Your prompt here",
-  "modelId": 3
-}
-```
+`strategy` is optional — defaults to `ai-powered`. Other values: `balanced`, `cost`, `performance`, `quality`.
 
 **Response:**
 ```json
@@ -126,87 +117,57 @@ GET    /api/analytics/dashboard    # Get dashboard metrics
 
 ## 🎯 Routing Strategies
 
-### 1. Balanced (Default)
-- 60% weight on speed
-- 40% weight on capability quality
-- Best for general use
+### AI-Powered (Default)
+- Compound Mini reads the user's prompt and selects the best model from the registry
+- Returns a model ID and reasoning string
+- Falls back to `balanced` if AI routing fails
 
-### 2. Cost-Optimized
-- Picks fastest free model
-- Since all are free, optimizes for speed
-- Best for high-volume requests
+### Balanced
+- 60% weight on speed (avgLatency), 40% on capability quality score
+- Good general-purpose fallback
 
-### 3. Performance-Optimized
-- Picks model with lowest latency
-- Usually selects Groq models (100-160ms)
-- Best for real-time applications
+### Performance
+- Picks lowest latency model — usually Groq models (~100ms)
 
-### 4. Quality-Optimized
-- Prioritizes thinking/reasoning capabilities
-- Picks Qwen 235B Thinking for complex tasks
-- Best for complex problems
+### Quality
+- Prioritizes capability score: reasoning > analysis > code > text-generation
 
-## 🧠 Intelligent Features
-
-### Intent Detection
-Automatically detects required capabilities from input:
-- **Logic/reasoning** → Routes to thinking models
-- **Code requests** → Routes to code specialists
-- **Fast queries** → Routes to Groq models
-
-### Capability-Based Scoring
-Models scored by capability quality:
-- Thinking: 100 points
-- Reasoning: 80 points
-- Analysis: 70 points
-- Code: 50 points
-- Documentation: 40 points
+### Cost
+- Fastest model (all models are currently free-tier)
 
 ## 🔧 AI Provider Services
 
-### OpenRouter Provider (`aiProvider.js`)
-- Connects to OpenRouter API
-- Supports Gemini 2.0 Flash
-
 ### Mistral Provider (`mistralProvider.js`)
-- Direct Mistral API connection
-- Uses Codestral endpoint
+- Codestral endpoint
 - Optimized for code generation
 
 ### Cerebras Provider (`cerebrasProvider.js`)
-- Ultra-fast inference
-- Thinking and reasoning models
-- High rate limits
+- Models: Z.AI GLM 4.7, OpenAI GPT OSS 120B, Llama 3.1 8B
+- Fast inference, good for general reasoning
 
 ### Groq Provider (`groqProvider.js`)
-- Fastest inference (100-160ms)
-- 5 different models
-- Best for performance-critical tasks
+- Models: Llama 4 Scout 17B, Llama 3.1 8B Instant, Allam 2 7B, Compound Mini, Compound
+- Lowest latency (~100-160ms)
+- Compound Mini is used as the AI meta-router
 
 ### Cohere Provider (`cohereProvider.js`)
-- Advanced reasoning capabilities
-- Multilingual support
-- Command R and Command R+ models
+- Command R+ and Command R
+- Kept in registry for future activation
 
-### Generic Provider (`genericProvider.js`)
-- Supports custom OpenAI-compatible APIs
-- Used as fallback for unknown providers
-- REST API only (no SDK required)
+## 📊 Model Registry
 
-## 📊 Model Configuration
-
-Models configured in `data/models.js`:
+11 active models in `data/models.js`. Each entry:
 ```js
 {
-  id: 1,
+  id: 9,
   name: 'Compound Mini',
   provider: 'Groq',
   status: 'active',
-  capabilities: ['text-generation'],
+  capabilities: ['text-generation', 'reasoning'],
   costPer1k: 0.0,
   avgLatency: 100,
-  rateLimit: { rpm: 30, rpd: 250, tpm: 70000 },
-  model_id: 'groq/compound-mini',
+  rateLimit: { rpm: 30, rpd: 14400, tpm: 70000 },
+  model_id: 'compound-beta-mini',
   apiProvider: 'groq'
 }
 ```
@@ -220,11 +181,9 @@ Models configured in `data/models.js`:
 
 ## 📈 Rate Limits
 
-All providers have rate limits:
 - **Groq**: 30 RPM per model
 - **Cerebras**: 10-30 RPM, up to 14,400/day
-- **Mistral**: 60 RPM (generous)
-- **OpenRouter**: 10 RPM (free tier)
+- **Mistral**: 60 RPM
 
 ## 🚀 Deployment
 
@@ -236,15 +195,3 @@ Ready for deployment to:
 
 Environment variables must be set on hosting platform.
 
-## 🧪 Testing
-
-Test the routing logic:
-```bash
-curl -X POST http://localhost:5000/api/ai/process \
-  -H "Content-Type: application/json" \
-  -d '{"input":"Hello world","strategy":"balanced"}'
-```
-
----
-
-Built with ❤️ for the Distributed AI OS

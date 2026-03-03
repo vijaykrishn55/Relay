@@ -2,19 +2,14 @@ import axios from 'axios'
 
 const API_BASE_URL = 'http://localhost:5000/api'
 
-// Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  headers: { 'Content-Type': 'application/json' }
 })
 
-// API endpoints
 export const modelsAPI = {
   getAll: () => api.get('/models'),
-  getById: (id) => api.get(`/models/${id}`),
-  create:(data)=> api.post('/models',data)
+  create: (data) => api.post('/models', data)
 }
 
 export const analyticsAPI = {

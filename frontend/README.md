@@ -1,23 +1,22 @@
-# Distributed AI OS - Frontend
+# Relay — Frontend
 
-React-based interface for intelligent AI model routing across multiple providers.
+React-based chat interface for AI-powered model routing.
 
 ## 🚀 Features
 
-- **Dashboard** - Real-time metrics and request monitoring
-- **Playground** - Interactive AI testing with auto/manual mode
-- **Models** - View and add AI models
-- **Responsive Design** - Clean, modern UI with Tailwind CSS
+- **Chat** — chat interface with message history, typing indicator, and auto-scroll
+- **Dashboard** — Real-time request metrics, active model count, recent request log
+- **Models** — View all registered models, capabilities, provider, and API key status
+- **Fixed Sidebar** — Persistent navigation with Dashboard, Chat, and Models
 
 ## 🛠️ Tech Stack
 
-- **React** - UI library
-- **Vite** - Fast build tool
-- **React Router** - Navigation
-- **Tailwind CSS** - Styling
-- **Axios** - API requests
-- **Recharts** - Data visualization
-- **Lucide React** - Icons
+- **React 19** — UI library
+- **Vite** — Fast build tool
+- **React Router** — Client-side routing
+- **Tailwind CSS** — Styling
+- **Axios** — API requests
+- **Lucide React** — Icons
 
 ## 📦 Setup
 
@@ -38,17 +37,19 @@ npm run build
 ```
 src/
 ├── components/
+│   ├── Layout.jsx          # Fixed sidebar + main content shell
 │   ├── AddModel.jsx        # Add new model modal
-│   ├── ModelDropdown.jsx   # Model selector
 │   ├── ModelCard.jsx       # Model display card
-│   └── ...
+│   ├── MetricCard.jsx      # Dashboard metric tile
+│   ├── RequestsTable.jsx   # Recent requests table
+│   └── LoadingSpinner.jsx  # Loading state component
 ├── pages/
 │   ├── Dashboard.jsx       # Analytics dashboard
-│   ├── Playground.jsx      # AI testing interface
-│   └── Models.jsx          # Model management
+│   ├── chat.jsx            # ChatGPT-style AI chat
+│   └── Models.jsx          # Model registry
 ├── services/
-│   └── api.js              # API calls
-└── App.jsx
+│   └── api.js              # Axios API client
+└── App.jsx                 # Root router
 ```
 
 ## 🔗 Backend Connection

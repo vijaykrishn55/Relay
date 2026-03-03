@@ -1,20 +1,5 @@
 const models = [
-  // OpenRouter - Gemini
-  {
-    id: 1,
-    name: 'Gemini 2.0 Flash',
-    provider: 'Google (OpenRouter)',
-    status: 'active',
-    capabilities: ['text-generation', 'code', 'reasoning'],
-    costPer1k: 0.0,
-    avgLatency: 280,
-    rateLimit: { rpm: 10, tpm: 50000 },  // Typical free tier
-    endpoint: 'https://openrouter.ai/api/v1',
-    model_id: 'google/gemini-2.0-flash-exp:free',
-    apiProvider: 'openrouter'
-  },
-  
-  // Mistral - Codestral
+  // Mistral
   {
     id: 2,
     name: 'Codestral',
@@ -23,54 +8,54 @@ const models = [
     capabilities: ['text-generation', 'code', 'reasoning', 'documentation'],
     costPer1k: 0.0,
     avgLatency: 250,
-    rateLimit: { rpm: 60, tpm: 100000 },  // Generous for free
+    rateLimit: { rpm: 60, tpm: 100000 },
     endpoint: 'https://codestral.mistral.ai',
     model_id: 'codestral-latest',
     apiProvider: 'mistral'
   },
   
-  // Cerebras Models (CORRECTED NAMES)
+  // Cerebras
   {
     id: 3,
-    name: 'Qwen 235B Thinking',
-    provider: 'Cerebras',
-    status: 'active',
-    capabilities: ['text-generation', 'reasoning', 'analysis', 'thinking'],
-    costPer1k: 0.0,
-    avgLatency: 200,
-    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },  // From screenshot
-    endpoint: 'https://api.cerebras.ai',
-    model_id: 'qwen2.5-32b',
-    apiProvider: 'cerebras'
-  },
-  {
-    id: 4,
-    name: 'Qwen 3 Coder 480B',
+    name: 'Z.AI GLM 4.7',
     provider: 'Cerebras',
     status: 'active',
     capabilities: ['text-generation', 'code', 'reasoning'],
     costPer1k: 0.0,
     avgLatency: 180,
-    rateLimit: { rpm: 10, tpm: 150000, daily: 100 },  // From screenshot
+    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },
     endpoint: 'https://api.cerebras.ai',
-    model_id: 'qwen2.5-coder-32b',
+    model_id: 'zai-glm-4.7',
+    apiProvider: 'cerebras'
+  },
+  {
+    id: 4,
+    name: 'OpenAI GPT OSS',
+    provider: 'Cerebras',
+    status: 'active',
+    capabilities: ['text-generation', 'code', 'reasoning', 'analysis'],
+    costPer1k: 0.0,
+    avgLatency: 200,
+    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },
+    endpoint: 'https://api.cerebras.ai',
+    model_id: 'gpt-oss-120b',
     apiProvider: 'cerebras'
   },
   {
     id: 5,
-    name: 'Llama 4 Maverick',
+    name: 'Llama 3.1 8B',
     provider: 'Cerebras',
     status: 'active',
-    capabilities: ['text-generation', 'reasoning'],
+    capabilities: ['text-generation', 'code'],
     costPer1k: 0.0,
-    avgLatency: 220,
-    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },  // From screenshot
+    avgLatency: 150,
+    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },
     endpoint: 'https://api.cerebras.ai',
-    model_id: 'llama-3.3-70b',
+    model_id: 'llama3.1-8b',
     apiProvider: 'cerebras'
   },
   
-  // Groq Models (CORRECTED - Exact model names from screenshot)
+  // Groq
   {
     id: 6,
     name: 'Allam 2 7B',
@@ -79,7 +64,7 @@ const models = [
     capabilities: ['text-generation', 'multilingual'],
     costPer1k: 0.0,
     avgLatency: 150,
-    rateLimit: { rpm: 30, rpd: 7000, tpm: 6000, tpd: 500000 },  // From screenshot
+    rateLimit: { rpm: 30, rpd: 7000, tpm: 6000, tpd: 500000 },
     endpoint: 'https://api.groq.com',
     model_id: 'allam-2-7b',
     apiProvider: 'groq'
@@ -92,7 +77,7 @@ const models = [
     capabilities: ['text-generation', 'code'],
     costPer1k: 0.0,
     avgLatency: 120,
-    rateLimit: { rpm: 30, rpd: 14400, tpm: 6000, tpd: 500000 },  // From screenshot
+    rateLimit: { rpm: 30, rpd: 14400, tpm: 6000, tpd: 500000 },
     endpoint: 'https://api.groq.com',
     model_id: 'llama-3.1-8b-instant',
     apiProvider: 'groq'
@@ -105,7 +90,7 @@ const models = [
     capabilities: ['text-generation', 'reasoning', 'analysis'],
     costPer1k: 0.0,
     avgLatency: 160,
-    rateLimit: { rpm: 30, rpd: 1000, tpm: 30000, tpd: 500000 },  // From screenshot
+    rateLimit: { rpm: 30, rpd: 1000, tpm: 30000, tpd: 500000 },
     endpoint: 'https://api.groq.com',
     model_id: 'meta-llama/llama-4-scout-17b-16e-instruct',
     apiProvider: 'groq'
@@ -118,7 +103,7 @@ const models = [
     capabilities: ['text-generation'],
     costPer1k: 0.0,
     avgLatency: 100,
-    rateLimit: { rpm: 30, rpd: 250, tpm: 70000, tpd: null },  // From screenshot
+    rateLimit: { rpm: 30, rpd: 250, tpm: 70000 },
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound-mini',
     apiProvider: 'groq'
@@ -131,7 +116,7 @@ const models = [
     capabilities: ['text-generation', 'reasoning'],
     costPer1k: 0.0,
     avgLatency: 140,
-    rateLimit: { rpm: 30, rpd: 250, tpm: 70000, tpd: null },  // From screenshot
+    rateLimit: { rpm: 30, rpd: 250, tpm: 70000 },
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound',
     apiProvider: 'groq'
@@ -146,7 +131,7 @@ const models = [
     capabilities: ['text-generation', 'reasoning', 'multilingual'],
     costPer1k: 0.0,
     avgLatency: 300,
-    rateLimit: { rpm: 20, tpm: 40000 },  // Trial tier limits
+    rateLimit: { rpm: 20, tpm: 40000 },
     endpoint: 'https://api.cohere.ai',
     model_id: 'command-r-plus',
     apiProvider: 'cohere'
