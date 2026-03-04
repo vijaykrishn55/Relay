@@ -5,12 +5,14 @@ const AIProvider = require('../services/aiProvider')
 const MistralProvider = require('../services/mistralProvider')
 const CerebrasProvider = require('../services/cerebrasProvider')
 const GroqProvider = require('../services/groqProvider')
+const CohereProvider = require('../services/cohereProvider')
 const models = require('../data/models')
 
 const openrouterProvider = new AIProvider()
 const mistralProvider = new MistralProvider()
 const cerebrasProvider = new CerebrasProvider()
 const groqProvider = new GroqProvider()
+const cohereProvider = new CohereProvider()
 
 router.post('/process', async (req, res) => {
   try {
@@ -50,6 +52,9 @@ router.post('/process', async (req, res) => {
         break
       case 'openrouter':
         response = await openrouterProvider.callModel(selectedModel, input)
+        break
+      case 'cohere':
+        response = await cohereProvider.callModel(selectedModel, input)
         break
       default:
         throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)

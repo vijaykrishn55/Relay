@@ -123,7 +123,9 @@ CRITICAL: Return ONLY valid JSON with no markdown formatting, no code blocks, no
       'Llama 3.1 8B Instant': 'ultra-fast simple tasks, quick responses',
       'Llama 4 Scout 17B': 'reasoning, analysis, research tasks',
       'Compound Mini': 'lightweight fast tasks, simple queries',
-      'Compound': 'balanced reasoning and speed'
+      'Compound': 'balanced reasoning and speed',
+      'Command A Reasoning': 'deep reasoning, complex analysis, Multilingual, structured outputs, tool use',
+      'Command R Plus': 'Multilingual, Safety Modes, Citations, Tool Use, Structured Output'
     };
     
     return specialties[model.name] || 'general-purpose tasks';

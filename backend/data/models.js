@@ -9,6 +9,8 @@ const models = [
     costPer1k: 0.0,
     avgLatency: 250,
     rateLimit: { rpm: 60, tpm: 100000 },
+    contextWindow: 128000,
+    maxOutputTokens: 128000,
     endpoint: 'https://codestral.mistral.ai',
     model_id: 'codestral-latest',
     apiProvider: 'mistral'
@@ -23,7 +25,10 @@ const models = [
     capabilities: ['text-generation', 'code', 'reasoning'],
     costPer1k: 0.0,
     avgLatency: 180,
-    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },
+    // Free tier severely reduced: RPM 10, RPD only 100
+    rateLimit: { rpm: 10, tpm: 60000, rpd: 100 },
+    contextWindow: 128000,
+    maxOutputTokens: 128000,
     endpoint: 'https://api.cerebras.ai',
     model_id: 'zai-glm-4.7',
     apiProvider: 'cerebras'
@@ -36,7 +41,9 @@ const models = [
     capabilities: ['text-generation', 'code', 'reasoning', 'analysis'],
     costPer1k: 0.0,
     avgLatency: 200,
-    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },
+    rateLimit: { rpm: 30, tpm: 64000, rpd: 14400 },
+    contextWindow: 128000,
+    maxOutputTokens: 65536,
     endpoint: 'https://api.cerebras.ai',
     model_id: 'gpt-oss-120b',
     apiProvider: 'cerebras'
@@ -49,7 +56,9 @@ const models = [
     capabilities: ['text-generation', 'code'],
     costPer1k: 0.0,
     avgLatency: 150,
-    rateLimit: { rpm: 30, tpm: 60000, daily: 14400 },
+    rateLimit: { rpm: 30, tpm: 60000, rpd: 14400 },
+    contextWindow: 128000,
+    maxOutputTokens: 128000,
     endpoint: 'https://api.cerebras.ai',
     model_id: 'llama3.1-8b',
     apiProvider: 'cerebras'
@@ -65,6 +74,8 @@ const models = [
     costPer1k: 0.0,
     avgLatency: 150,
     rateLimit: { rpm: 30, rpd: 7000, tpm: 6000, tpd: 500000 },
+    contextWindow: 4096,
+    maxOutputTokens: 4096,
     endpoint: 'https://api.groq.com',
     model_id: 'allam-2-7b',
     apiProvider: 'groq'
@@ -78,6 +89,8 @@ const models = [
     costPer1k: 0.0,
     avgLatency: 120,
     rateLimit: { rpm: 30, rpd: 14400, tpm: 6000, tpd: 500000 },
+    contextWindow: 131072,
+    maxOutputTokens: 131072,
     endpoint: 'https://api.groq.com',
     model_id: 'llama-3.1-8b-instant',
     apiProvider: 'groq'
@@ -91,6 +104,8 @@ const models = [
     costPer1k: 0.0,
     avgLatency: 160,
     rateLimit: { rpm: 30, rpd: 1000, tpm: 30000, tpd: 500000 },
+    contextWindow: 131072,
+    maxOutputTokens: 8192,
     endpoint: 'https://api.groq.com',
     model_id: 'meta-llama/llama-4-scout-17b-16e-instruct',
     apiProvider: 'groq'
@@ -104,6 +119,8 @@ const models = [
     costPer1k: 0.0,
     avgLatency: 100,
     rateLimit: { rpm: 30, rpd: 250, tpm: 70000 },
+    contextWindow: 131072,
+    maxOutputTokens: 8192,
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound-mini',
     apiProvider: 'groq'
@@ -117,6 +134,8 @@ const models = [
     costPer1k: 0.0,
     avgLatency: 140,
     rateLimit: { rpm: 30, rpd: 250, tpm: 70000 },
+    contextWindow: 131072,
+    maxOutputTokens: 8192,
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound',
     apiProvider: 'groq'
@@ -125,28 +144,32 @@ const models = [
   // Cohere Models
   {
     id: 11,
-    name: 'Command R+',
+    name: 'Command A Reasoning',
     provider: 'Cohere',
     status: 'active',
-    capabilities: ['text-generation', 'reasoning', 'multilingual'],
+    capabilities: ['text-generation', 'reasoning', 'analysis'],
     costPer1k: 0.0,
     avgLatency: 300,
     rateLimit: { rpm: 20, tpm: 40000 },
+    contextWindow: 256000,
+    maxOutputTokens: 32000,
     endpoint: 'https://api.cohere.ai',
-    model_id: 'command-r-plus',
+    model_id: 'command-a-reasoning-08-2025',
     apiProvider: 'cohere'
   },
   {
     id: 12,
-    name: 'Command R',
+    name: 'Command R Plus',
     provider: 'Cohere',
     status: 'active',
-    capabilities: ['text-generation', 'reasoning'],
+    capabilities: ['text-generation', 'reasoning', 'multilingual'],
     costPer1k: 0.0,
-    avgLatency: 250,
+    avgLatency: 280,
     rateLimit: { rpm: 20, tpm: 40000 },
+    contextWindow: 128000,
+    maxOutputTokens: 4000,
     endpoint: 'https://api.cohere.ai',
-    model_id: 'command-r',
+    model_id: 'command-r-plus-08-2024',
     apiProvider: 'cohere'
   }
 ]
