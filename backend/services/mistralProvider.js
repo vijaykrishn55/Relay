@@ -7,7 +7,7 @@ class MistralProvider {
     });
   }
 
-  async callModel(model, input) {
+  async callModel(model, input, systemContext = null) {
     try {
       const startTime = Date.now();
 
@@ -21,17 +21,23 @@ class MistralProvider {
 
       const mistralModel = modelMap[model.name] || "codestral-latest";
       const isCodestral = mistralModel === "codestral-latest";
-      const endpoint =isCodestral
+      const endpoint = isCodestral
         ? "https://codestral.mistral.ai/v1/chat/completions"
         : "https://api.mistral.ai/v1/chat/completions";
       
       console.log(`📡 Calling Mistral model: ${mistralModel}`);
       console.log(`🌐 Endpoint: ${endpoint}`);
       console.log(`📝 Input: ${input.substring(0, 50)}...`);
+
+      const messages = [];
+      if (systemContext) {
+        messages.push({ role: "system", content: systemContext });
+      }
+      messages.push({ role: "user", content: input });
+
       let chatResponse;
 
       if (isCodestral) {
-        // Create a new client instance with Codestral endpoint
         const codestralClient = new Mistral({
           apiKey: process.env.MISTRAL_API_KEY,
           serverURL: "https://codestral.mistral.ai",
@@ -39,23 +45,12 @@ class MistralProvider {
 
         chatResponse = await codestralClient.chat.complete({
           model: mistralModel,
-          messages: [
-            {
-              role: "user",
-              content: input,
-            },
-          ],
+          messages,
         });
       } else {
-        // Use regular Mistral API
         chatResponse = await this.client.chat.complete({
           model: mistralModel,
-          messages: [
-            {
-              role: "user",
-              content: input,
-            },
-          ],
+          messages,
         });
       }
 

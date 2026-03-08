@@ -2,11 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Loader, AlertCircle, Bot, User } from "lucide-react";
 import { aiAPI } from "../services/api";
 
+function generateSessionId() {
+  return 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+}
+
 function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sessionId] = useState(() => generateSessionId());
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -29,6 +34,7 @@ function Chat() {
         input: userMessage,
         strategy: "ai-powered",
         requiredCapabilities: ["text-generation"],
+        sessionId,
       });
 
       setMessages((prev) => [

@@ -1,0 +1,48 @@
+{
+  "sessionId": "session_1772903423828_wwd5hop",
+  "entries": [
+    {
+      "userSummary": "The user introduced themselves as Vijay and asked the AI to say hi.",
+      "responseSummary": "The AI greeted Vijay with a friendly 'Hi Vijay!' and asked how it could help.",
+      "model": "Compound Mini",
+      "timestamp": "2026-03-07T17:10:54.970Z"
+    },
+    {
+      "userSummary": "The user asked for the meaning of the word “amount”.",
+      "responseSummary": "The AI explained that an amount is a quantity or total of something, typically measured or counted, and gave examples (water, money, time). It noted that “amount” is used for uncountable items, whereas “number” is used for countable items.",
+      "model": "Compound Mini",
+      "timestamp": "2026-03-07T17:11:41.408Z"
+    },
+    {
+      "userSummary": "Requested a detailed assessment and a 0-100 likelihood score for becoming a data scientist in 2 months by studying 10 hours daily.",
+      "responseSummary": "Listed essential data science skills, estimated the hours needed for each area, highlighted that 10 hours/day yields about 600 hours, and assigned an unrealistic score of 20/10, implying the goal is highly improbable.",
+      "model": "Llama 4 Scout 17B",
+      "timestamp": "2026-03-07T17:13:31.642Z"
+    },
+    {
+      "userSummary": "The user shared their engineering GPA of 6.7 and implied they want to know its relevance.",
+      "responseSummary": "The AI said a 6.7/10 GPA is solid but only a minor factor (≈10%) in data‑science hiring, emphasizing technical skills (≈40%), portfolio/experience (≈35%), and soft/business skills (≈15%). It suggested concrete steps to improve each area and noted an updated likelihood estimate for becoming a data scientist.",
+      "model": "Compound Mini",
+      "timestamp": "2026-03-07T17:16:20.349Z"
+    },
+    {
+      "userSummary": "The user asked for a brief summary of their personal details, including name and other information.",
+      "responseSummary": "The AI provided a concise profile: Name Vijay, engineering degree with GPA 6.7/10, aiming to become a Data Scientist in 2 months, planning ~10 hours daily study covering programming, statistics, ML fundamentals, data engineering, projects, and soft skills, noting GPA's modest impact and emphasizing skill building and portfolio.",
+      "model": "Compound Mini",
+      "timestamp": "2026-03-07T17:21:42.287Z"
+    },
+    {
+      "userSummary": "User asked the AI to think and answer again.",
+      "responseSummary": "AI indicated it reviewed the conversation, is ready to respond, and asked the user for their next question or topic.",
+      "model": "Llama 4 Scout 17B",
+      "timestamp": "2026-03-07T17:22:32.346Z"
+    },
+    {
+      "userSummary": "Requested a brief personal summary (about me) without using Compound Mini.",
+      "responseSummary": "Provided a concise profile including name (Vijay), engineering background with GPA 6.7/10, career aspiration as a Data Scientist, study regime of 10 hours daily for 2 months covering programming, statistics, ML fundamentals, data engineering, project execution, and soft skills, current situation aiming to transition into data science, and key challenges such as short timeline, moderate technical foundation, and need for a robust portfolio.",
+      "model": "Llama 3.1 8B Instant",
+      "timestamp": "2026-03-07T17:23:30.199Z"
+    }
+  ],
+  "createdAt": "2026-03-07T17:10:54.970Z"
+}

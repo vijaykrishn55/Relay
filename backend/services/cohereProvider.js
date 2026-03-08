@@ -8,15 +8,21 @@ class CohereProvider {
     this.name = 'Cohere'
   }
 
-  async callModel(model, input) {
+  async callModel(model, input, systemContext = null) {
     const startTime = Date.now()
 
     try {
       console.log(`📡 Calling Cohere model: ${model.model_id}`)
 
+      const messages = []
+      if (systemContext) {
+        messages.push({ role: 'system', content: systemContext })
+      }
+      messages.push({ role: 'user', content: input })
+
       const response = await this.client.chat({
         model: model.model_id,
-        messages: [{ role: 'user', content: input }]
+        messages
       })
 
       const latency = Date.now() - startTime

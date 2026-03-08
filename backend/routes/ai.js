@@ -1,25 +1,37 @@
 const express = require('express')
 const router = express.Router()
 const AIRouter = require('../services/router')
-const AIProvider = require('../services/aiProvider')
 const MistralProvider = require('../services/mistralProvider')
 const CerebrasProvider = require('../services/cerebrasProvider')
 const GroqProvider = require('../services/groqProvider')
 const CohereProvider = require('../services/cohereProvider')
+const ConversationMemory = require('../services/conversationMemory')
 const models = require('../data/models')
 
-const openrouterProvider = new AIProvider()
 const mistralProvider = new MistralProvider()
 const cerebrasProvider = new CerebrasProvider()
 const groqProvider = new GroqProvider()
 const cohereProvider = new CohereProvider()
 
+// Conversation memory uses Compound Mini (id 9) to extract summaries
+const routerModel = models.find(m => m.id === 9)
+const conversationMemory = new ConversationMemory(groqProvider, routerModel)
+
 router.post('/process', async (req, res) => {
   try {
-    const { input, strategy, requiredCapabilities } = req.body
+    const { input, strategy, requiredCapabilities, sessionId } = req.body
 
     if (!input || input.trim() === '') {
       return res.status(400).json({ error: 'Input is required' })
+    }
+
+    // Build conversation context from stored summaries
+    let systemContext = null
+    if (sessionId) {
+      systemContext = conversationMemory.buildContext(sessionId)
+      if (systemContext) {
+        console.log(`📝 Loaded conversation context for session ${sessionId}`)
+      }
     }
 
     const aiRouter = new AIRouter(models)
@@ -42,22 +54,24 @@ router.post('/process', async (req, res) => {
 
     switch (selectedModel.apiProvider) {
       case 'mistral':
-        response = await mistralProvider.callModel(selectedModel, input)
+        response = await mistralProvider.callModel(selectedModel, input, systemContext)
         break
       case 'cerebras':
-        response = await cerebrasProvider.callModel(selectedModel, input)
+        response = await cerebrasProvider.callModel(selectedModel, input, systemContext)
         break
       case 'groq':
-        response = await groqProvider.callModel(selectedModel, input)
-        break
-      case 'openrouter':
-        response = await openrouterProvider.callModel(selectedModel, input)
+        response = await groqProvider.callModel(selectedModel, input, systemContext)
         break
       case 'cohere':
-        response = await cohereProvider.callModel(selectedModel, input)
+        response = await cohereProvider.callModel(selectedModel, input, systemContext)
         break
       default:
         throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
+    }
+
+    // Record the exchange summary in the background (non-blocking)
+    if (sessionId) {
+      conversationMemory.recordExchange(sessionId, input, response.output, selectedModel.name)
     }
 
     res.json({

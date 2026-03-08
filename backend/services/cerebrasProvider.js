@@ -7,7 +7,7 @@ class CerebrasProvider {
     })
   }
 
-  async callModel(model, input) {
+  async callModel(model, input, systemContext = null) {
     try {
       const startTime = Date.now()
 
@@ -23,14 +23,15 @@ class CerebrasProvider {
       console.log(`📡 Calling Cerebras model: ${cerebrasModel}`)
       console.log(`📝 Input: ${input.substring(0, 50)}...`)
 
+      const messages = []
+      if (systemContext) {
+        messages.push({ role: 'system', content: systemContext })
+      }
+      messages.push({ role: 'user', content: input })
+
       const completion = await this.client.chat.completions.create({
         model: cerebrasModel,
-        messages: [
-          {
-            role: 'user',
-            content: input
-          }
-        ]
+        messages
       })
 
       const endTime = Date.now()
