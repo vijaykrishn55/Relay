@@ -11,10 +11,12 @@ app.use(express.json())
 const modelsRoutes = require('./routes/models')
 const analyticsRoutes = require('./routes/analytics')
 const aiRoutes = require('./routes/ai')
+const sessionsRoutes = require('.//routes/sessions')
 
 app.use('/api/models', modelsRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/sessions', sessionsRoutes)
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -23,7 +25,8 @@ app.get('/', (req, res) => {
     endpoints: [
       '/api/models',
       '/api/analytics/dashboard',
-      '/api/ai/process'
+      '/api/ai/process',
+      '/api/sessions'
     ]
   })
 })

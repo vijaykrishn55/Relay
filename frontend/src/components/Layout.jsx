@@ -1,9 +1,16 @@
 import {Link, useLocation} from 'react-router-dom';
 import {LayoutDashboard, MessageSquare, Database} from 'lucide-react';
+import { useChat } from '../context/ChatContext';
+import SessionList from './SessionList';
 
 
 function Layout({children}) {
         const location = useLocation();
+
+        const {
+                sessions, activeSessionId,
+                handleSelectSession, handleNewChat, handleDeleteSession, renameSession,
+        } = useChat();
 
         const isActive =(path)=>{
                 return location.pathname === path
@@ -22,7 +29,7 @@ function Layout({children}) {
                                         <h2 className="text-xl font-bold text-gray-800">Relay</h2>
                                         <p className="text-xs text-gray-400 mt-1">AI Model Router</p>
                                 </div>
-                                <nav className="mt-6 flex-1">
+                                <nav className="mt-2">
                                         {navItems.map((item)=>{
                                                 const Icon= item.icon;
                                                 const active = isActive(item.path);
@@ -38,6 +45,18 @@ function Layout({children}) {
                                                 )
                                         })}
                                 </nav>
+
+                                {/* Session list — always visible */}
+                                <div className="flex-1 overflow-hidden flex flex-col border-t border-gray-100 mt-3">
+                                        <SessionList
+                                                sessions={sessions}
+                                                activeSessionId={activeSessionId}
+                                                onSelect={handleSelectSession}
+                                                onCreate={handleNewChat}
+                                                onDelete={handleDeleteSession}
+                                                onRename={renameSession}
+                                        />
+                                </div>
                         </aside>
                         {/* main content offset by sidebar width */}
                         <main className="ml-64 min-h-screen">

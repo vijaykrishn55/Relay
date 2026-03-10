@@ -20,4 +20,12 @@ export const aiAPI = {
   process: (data) => api.post('/ai/process', data)
 }
 
+export const sessionsAPI = {
+  getAll: () => api.get('/sessions'),
+  getById: (id) => api.get(`/sessions/${id}`),
+  create: () => api.post('/sessions'),
+  rename: (id, title) => api.put(`/sessions/${id}`, { title }),
+  delete: (id) => api.delete(`/sessions/${id}`)
+}
+
 export default api

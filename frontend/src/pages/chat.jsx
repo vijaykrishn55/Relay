@@ -1,73 +1,96 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect } from "react";
 import { Send, Loader, AlertCircle, Bot, User } from "lucide-react";
 import { aiAPI } from "../services/api";
-
-function generateSessionId() {
-  return 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-}
+import { useChat } from '../context/ChatContext'
 
 function Chat() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [sessionId] = useState(() => generateSessionId());
-  const bottomRef = useRef(null);
+  const {
+    input, setInput,
+    messages, setMessages,
+    loading, setLoading,
+    error, setError,
+    activeSessionId, setActiveSessionId,
+    bottomRef, skipLoadRef,
+    sessions, fetchSessions, createSession, loadSession, updateLocalTitle,
+  } = useChat()
 
+  // Auto-scroll to bottom whenever messages change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  // Load messages when switching sessions
+  useEffect(() => {
+    loadSession(activeSessionId)
+  }, [activeSessionId, loadSession])
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+    e.preventDefault()
+    if (!input.trim()) return
 
-    const userMessage = input.trim();
-    setInput("");
-    setError("");
+    const userMessage = input.trim()
+    setInput('')
+    setError('')
 
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-    setLoading(true);
+    let sessionId = activeSessionId
+    if (!sessionId) {
+      const session = await createSession()
+      sessionId = session.id
+      skipLoadRef.current = true
+      setActiveSessionId(session.id)
+    }
+
+    setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
+    setLoading(true)
+
+    // Optimistically update the session title from the first user message
+    const currentSession = sessions.find(s => s.id === sessionId)
+    if (currentSession && currentSession.title === 'New Chat') {
+      const autoTitle = userMessage.length > 40 ? userMessage.substring(0, 40) + '...' : userMessage
+      updateLocalTitle(sessionId, autoTitle)
+    }
 
     try {
       const response = await aiAPI.process({
         input: userMessage,
-        strategy: "ai-powered",
-        requiredCapabilities: ["text-generation"],
+        strategy: 'ai-powered',
+        requiredCapabilities: ['text-generation'],
         sessionId,
-      });
+      })
 
       setMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
+          role: 'assistant',
           content: response.data.output,
           model: response.data.model,
         },
-      ]);
+      ])
+
+      fetchSessions()
     } catch (err) {
-      console.error("Error:", err);
-      setError("Failed to get a response. Please try again.");
-      setMessages((prev) => prev.slice(0, -1));
+      console.error('Error:', err)
+      setError('Failed to get a response. Please try again.')
+      setMessages((prev) => prev.slice(0, -1))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit(e)
     }
-  };
+  }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
-      {/* Chat area */}
+    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto space-y-6">
 
-          {/* Empty state */}
           {messages.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center h-full pt-24 text-center">
               <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center mb-4">
@@ -80,31 +103,26 @@ function Chat() {
             </div>
           )}
 
-          {/* Messages */}
           {messages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              {msg.role === "assistant" && (
+            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'assistant' && (
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
                   <Bot size={16} className="text-white" />
                 </div>
               )}
-
-              <div className={`max-w-[75%] ${msg.role === "user" ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                <div
-                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white rounded-br-sm"
-                      : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm"
-                  }`}
-                >
+              <div className={`max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-br-sm'
+                    : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm'
+                }`}>
                   {msg.content}
                 </div>
-                {msg.role === "assistant" && msg.model && (
+                {msg.role === 'assistant' && msg.model && (
                   <span className="text-xs text-gray-400 ml-1">via {msg.model}</span>
                 )}
               </div>
-
-              {msg.role === "user" && (
+              {msg.role === 'user' && (
                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mt-1">
                   <User size={16} className="text-gray-600" />
                 </div>
@@ -112,7 +130,6 @@ function Chat() {
             </div>
           ))}
 
-          {/* Loading bubble */}
           {loading && (
             <div className="flex gap-3 justify-start">
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
@@ -120,9 +137,9 @@ function Chat() {
               </div>
               <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
                 <div className="flex gap-1 items-center h-5">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             </div>
@@ -151,9 +168,9 @@ function Chat() {
               className="flex-1 bg-transparent resize-none text-sm text-gray-800 placeholder-gray-400 focus:outline-none max-h-40"
               value={input}
               onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = e.target.scrollHeight + "px";
+                setInput(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = e.target.scrollHeight + 'px'
               }}
               onKeyDown={handleKeyDown}
               placeholder="Message Relay..."
@@ -164,11 +181,10 @@ function Chat() {
               disabled={loading || !input.trim()}
               className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
             >
-              {loading ? (
-                <Loader size={15} className="text-white animate-spin" />
-              ) : (
-                <Send size={15} className="text-white" />
-              )}
+              {loading
+                ? <Loader size={15} className="text-white animate-spin" />
+                : <Send size={15} className="text-white" />
+              }
             </button>
           </div>
           <p className="text-center text-xs text-gray-400 mt-2">
@@ -177,7 +193,7 @@ function Chat() {
         </form>
       </div>
     </div>
-  );
+  )
 }
 
 export default Chat;

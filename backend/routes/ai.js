@@ -7,6 +7,7 @@ const GroqProvider = require('../services/groqProvider')
 const CohereProvider = require('../services/cohereProvider')
 const ConversationMemory = require('../services/conversationMemory')
 const models = require('../data/models')
+const {addMessage}= require('../data/sessions')
 
 const mistralProvider = new MistralProvider()
 const cerebrasProvider = new CerebrasProvider()
@@ -70,10 +71,16 @@ router.post('/process', async (req, res) => {
     }
 
     // Record the exchange summary in the background (non-blocking)
+    if(sessionId){
+      addMessage(sessionId, {role: 'user', content: input})
+      addMessage(sessionId, {role: 'assistant', content: response.output, model: selectedModel.name})
+    }
+    
+    // record the exchange summary in background (non-blocking)
     if (sessionId) {
       conversationMemory.recordExchange(sessionId, input, response.output, selectedModel.name)
     }
-
+    
     res.json({
       success: true,
       input,
