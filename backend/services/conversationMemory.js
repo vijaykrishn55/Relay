@@ -1,12 +1,4 @@
-const fs = require('fs')
-const path = require('path')
-
-const CONVERSATIONS_DIR = path.join(__dirname, '..', 'data', 'conversations')
-
-// Ensure the conversations directory exists
-if (!fs.existsSync(CONVERSATIONS_DIR)) {
-  fs.mkdirSync(CONVERSATIONS_DIR, { recursive: true })
-}
+const { query } = require('../data/db')
 
 class ConversationMemory {
   constructor(groqProvider, routerModel) {
@@ -14,31 +6,28 @@ class ConversationMemory {
     this.routerModel = routerModel
   }
 
-  getFilePath(sessionId) {
-    // Sanitize sessionId to prevent path traversal
-    const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, '')
-    return path.join(CONVERSATIONS_DIR, `${safe}.json`)
-  }
-
-  load(sessionId) {
-    const filePath = this.getFilePath(sessionId)
-    if (!fs.existsSync(filePath)) {
-      return { sessionId, entries: [], createdAt: new Date().toISOString() }
+  async load(sessionId) {
+    const rows = await query(
+      'SELECT user_summary, response_summary, model, timestamp FROM conversation_summaries WHERE session_id = ? ORDER BY timestamp ASC',
+      [sessionId]
+    )
+    return {
+      sessionId,
+      entries: rows.map(r => ({
+        userSummary: r.user_summary,
+        responseSummary: r.response_summary,
+        model: r.model,
+        timestamp: r.timestamp
+      }))
     }
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-  }
-
-  save(sessionId, data) {
-    const filePath = this.getFilePath(sessionId)
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
   }
 
   /**
    * Build a system context string from stored summaries.
    * Returns null if no prior conversation exists.
    */
-  buildContext(sessionId) {
-    const data = this.load(sessionId)
+  async buildContext(sessionId) {
+    const data = await this.load(sessionId)
     if (!data.entries || data.entries.length === 0) return null
 
     const lines = data.entries.map((e, i) =>
@@ -50,7 +39,7 @@ class ConversationMemory {
 
   /**
    * After an exchange, call Compound Mini to extract key points,
-   * then append to the session file.
+   * then insert into the database.
    */
   async recordExchange(sessionId, userMessage, aiResponse, modelName) {
     try {
@@ -74,27 +63,33 @@ Return JSON:
         cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
         parsed = JSON.parse(cleaned)
       } catch {
-        // If extraction fails, create simple summaries ourselves
         parsed = {
           userSummary: userMessage.length > 120 ? userMessage.substring(0, 120) + '...' : userMessage,
           responseSummary: aiResponse.length > 200 ? aiResponse.substring(0, 200) + '...' : aiResponse
         }
       }
 
-      const data = this.load(sessionId)
-      data.entries.push({
-        userSummary: parsed.userSummary,
-        responseSummary: parsed.responseSummary,
-        model: modelName,
-        timestamp: new Date().toISOString()
-      })
+      await query(
+        'INSERT INTO conversation_summaries (session_id, user_summary, response_summary, model) VALUES (?, ?, ?, ?)',
+        [sessionId, parsed.userSummary, parsed.responseSummary, modelName]
+      )
 
-      // Keep only the last 50 exchanges to prevent unbounded growth
-      if (data.entries.length > 50) {
-        data.entries = data.entries.slice(-50)
+      // Keep only last 50 per session
+      const countRows = await query(
+        'SELECT COUNT(*) AS cnt FROM conversation_summaries WHERE session_id = ?',
+        [sessionId]
+      )
+      if (countRows[0].cnt > 50) {
+        await query(
+          `DELETE FROM conversation_summaries WHERE session_id = ? AND id NOT IN (
+            SELECT id FROM (SELECT id FROM conversation_summaries WHERE session_id = ? ORDER BY timestamp DESC LIMIT 50) AS keep
+          )`,
+          [sessionId, sessionId]
+        )
       }
 
-      this.save(sessionId, data)
+      const data = await this.load(sessionId)
+
       console.log(`💾 Saved conversation summary for session ${sessionId} (${data.entries.length} entries)`)
 
     } catch (error) {

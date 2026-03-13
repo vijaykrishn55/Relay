@@ -1,61 +1,83 @@
-const {v4: uuidv4}= require('uuid')
+const { v4: uuidv4 } = require('uuid')
+const { query } = require('./db')
 
-// in-memory session store - leacred on server restart
-
-const sessions = new Map()
-
-function createSession(){
-        const id = uuidv4()
-        const session ={
-                id, 
-                title: 'New Chat',
-                messages:[],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-        }
-        sessions.set(id, session)
-        return session
+async function createSession() {
+  const id = uuidv4()
+  await query(
+    'INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
+    [id, 'New Chat']
+  )
+  return getSession(id)
 }
 
-function getSession(id){
-        return sessions.get(id)|| null
+async function getSession(id) {
+  const rows = await query('SELECT * FROM sessions WHERE id = ?', [id])
+  if (rows.length === 0) return null
+
+  const session = rows[0]
+  const messages = await query(
+    'SELECT role, content, model, timestamp FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
+    [id]
+  )
+
+  return {
+    id: session.id,
+    title: session.title,
+    createdAt: session.created_at,
+    updatedAt: session.updated_at,
+    messages
+  }
 }
 
-function getAllSessions(){
-        return Array.from(sessions.values())
-        .sort((a,b)=> new Date(b.updatedAt)- new Date(a.updatedAt))
+async function getAllSessions() {
+  const rows = await query(
+    `SELECT s.id, s.title, s.created_at, s.updated_at,
+            (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS messageCount
+     FROM sessions s
+     ORDER BY s.updated_at DESC`
+  )
+  return rows.map(r => ({
+    id: r.id,
+    title: r.title,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    messageCount: r.messageCount
+  }))
 }
 
-function updateSession(id, changes){
-        const session = sessions.get(id)
-        if(!session) return null
-        const updated = {...session, ...changes, updatedAt: new Date().toISOString()}
-        sessions.set(id,updated)
-        return updated
+async function updateSession(id, changes) {
+  const session = await getSession(id)
+  if (!session) return null
+
+  if (changes.title !== undefined) {
+    await query('UPDATE sessions SET title = ? WHERE id = ?', [changes.title, id])
+  }
+  return getSession(id)
 }
 
-function deleteSession(id){
-        return sessions.delete(id)
+async function deleteSession(id) {
+  const result = await query('DELETE FROM sessions WHERE id = ?', [id])
+  return result.affectedRows > 0
 }
 
-function addMessage(sessionId, message){
-        const session = sessions.get(sessionId)
-        if(!session) return null
-        session.messages.push({
-                ...message,
-                timestamp: new Date().toISOString()
-        })
-        session.updatedAt = new Date().toISOString()
+async function addMessage(sessionId, message) {
+  const session = await getSession(sessionId)
+  if (!session) return null
 
-        // auto-title: use first user message 
+  await query(
+    'INSERT INTO messages (session_id, role, content, model, timestamp) VALUES (?, ?, ?, ?, NOW())',
+    [sessionId, message.role, message.content, message.model || null]
+  )
 
-        if(session.title === 'New Chat' && message.role === 'user'){
-                session.title = message.content.length >40 ? message.content.substring(0,40) + '...' : message.content
-        }
+  // auto-title: use first user message
+  if (session.title === 'New Chat' && message.role === 'user') {
+    const title = message.content.length > 40
+      ? message.content.substring(0, 40) + '...'
+      : message.content
+    await query('UPDATE sessions SET title = ? WHERE id = ?', [title, sessionId])
+  }
 
-        return session
-
-
+  return getSession(sessionId)
 }
 
-module.exports = {createSession, getSession, getAllSessions, updateSession, deleteSession, addMessage}
+module.exports = { createSession, getSession, getAllSessions, updateSession, deleteSession, addMessage }

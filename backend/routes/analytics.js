@@ -1,47 +1,49 @@
 const express = require('express')
 const router = express.Router()
-const models = require('../data/models')
+const { loadModels } = require('../data/models')
+const { query } = require('../data/db')
 
-let requestHistory = []
+router.get('/dashboard', async (req, res) => {
+  try {
+    const models = await loadModels()
 
-const getDashboardData = () => {
-  return {
-    metrics: {
-      totalRequests: requestHistory.length || 0,
-      avgCost: 0.0,
-      avgLatency: requestHistory.length > 0
-        ? Math.round(requestHistory.reduce((sum, r) => sum + r.latency, 0) / requestHistory.length)
-        : 0,
-      activeModels: models.filter(m => m.status === 'active').length
-    },
-    recentRequests: requestHistory.slice(-5).reverse().map(r => ({
-      time: new Date(r.timestamp).toLocaleTimeString(),
-      model: r.model,
-      latency: r.latency,
-      cost: r.cost,
-      status: 'success'
-    }))
+    const [countRow] = await query('SELECT COUNT(*) AS total FROM request_history')
+    const [avgRow] = await query('SELECT AVG(latency) AS avgLat FROM request_history')
+    const recentRows = await query(
+      'SELECT model, latency, cost, timestamp FROM request_history ORDER BY id DESC LIMIT 5'
+    )
+
+    res.json({
+      metrics: {
+        totalRequests: countRow.total || 0,
+        avgCost: 0.0,
+        avgLatency: Math.round(avgRow.avgLat || 0),
+        activeModels: models.filter(m => m.status === 'active').length
+      },
+      recentRequests: recentRows.map(r => ({
+        time: new Date(Number(r.timestamp)).toLocaleTimeString(),
+        model: r.model,
+        latency: r.latency,
+        cost: r.cost,
+        status: 'success'
+      }))
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
-}
-
-router.get('/dashboard', (req, res) => {
-  res.json(getDashboardData())
 })
 
-router.post('/track', (req, res) => {
-  const { model, latency, cost } = req.body
-  requestHistory.push({
-    model,
-    latency,
-    cost,
-    timestamp: Date.now()
-  })
-  
-  if (requestHistory.length > 100) {
-    requestHistory = requestHistory.slice(-100)
+router.post('/track', async (req, res) => {
+  try {
+    const { model, latency, cost } = req.body
+    await query(
+      'INSERT INTO request_history (model, latency, cost, timestamp) VALUES (?, ?, ?, ?)',
+      [model, latency, cost || 0, Date.now()]
+    )
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
-  
-  res.json({ success: true })
 })
 
 module.exports = router

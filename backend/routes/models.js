@@ -1,38 +1,50 @@
 const express = require('express')
 const router = express.Router()
-const models = require('../data/models')
+const { getModelsSync, loadModels } = require('../data/models')
+const { query } = require('../data/db')
 const { updateModelStatuses, checkApiKey } = require('../utils/apiKeyValidator')
 
 // GET all models with updated statuses
-router.get('/', (req, res) => {
-  const modelsWithStatus = updateModelStatuses(models)
-  res.json(modelsWithStatus)
+router.get('/', async (req, res) => {
+  try {
+    const models = await loadModels()
+    const modelsWithStatus = updateModelStatuses(models)
+    res.json(modelsWithStatus)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 // GET single model by ID with status check
-router.get('/:id', (req, res) => {
-  const model = models.find(m => m.id === parseInt(req.params.id))
-  
-  if (!model) {
-    return res.status(404).json({ error: 'Model not found' })
+router.get('/:id', async (req, res) => {
+  try {
+    const models = await loadModels()
+    const model = models.find(m => m.id === parseInt(req.params.id))
+    
+    if (!model) {
+      return res.status(404).json({ error: 'Model not found' })
+    }
+    
+    // Check API key and update status
+    const keyCheck = checkApiKey(model.apiProvider)
+    const modelWithStatus = {
+      ...model,
+      status: keyCheck.available ? 'active' : 'unavailable',
+      statusReason: keyCheck.reason
+    }
+    
+    res.json(modelWithStatus)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
-  
-  // Check API key and update status
-  const keyCheck = checkApiKey(model.apiProvider)
-  const modelWithStatus = {
-    ...model,
-    status: keyCheck.available ? 'active' : 'unavailable',
-    statusReason: keyCheck.reason
-  }
-  
-  res.json(modelWithStatus)
 })
 
 // POST new model with API key validation
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
+    const models = await loadModels()
     const newModel = {
-      id: models.length + 1,
+      id: (models.length > 0 ? Math.max(...models.map(m => m.id)) : 0) + 1,
       model_id: req.body.name.toLowerCase().replace(/\s+/g, '-'),
       avgLatency: 200,
       costPer1k: req.body.pricing?.input || 0,
@@ -85,7 +97,17 @@ router.post('/', (req, res) => {
     newModel.status = keyCheck.available ? 'active' : 'unavailable'
     newModel.statusReason = keyCheck.reason
 
-    models.push(newModel)
+    // Insert into DB
+    await query(
+      `INSERT INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newModel.id, newModel.name, newModel.provider, newModel.status,
+        JSON.stringify(newModel.capabilities), newModel.costPer1k, newModel.avgLatency,
+        JSON.stringify(newModel.rateLimit), newModel.contextWindow || 0, newModel.maxOutputTokens || 0,
+        newModel.endpoint, newModel.model_id, newModel.apiProvider
+      ]
+    )
     res.status(201).json(newModel)
     
   } catch (error) {

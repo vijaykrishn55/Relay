@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Send, Loader, AlertCircle, Bot, User } from "lucide-react";
 import { aiAPI } from "../services/api";
 import { useChat } from '../context/ChatContext'
+import MessageBubble from "../components/MessageBubble";
 
 function Chat() {
   const {
@@ -13,6 +14,11 @@ function Chat() {
     bottomRef, skipLoadRef,
     sessions, fetchSessions, createSession, loadSession, updateLocalTitle,
   } = useChat()
+  const activeSessionIdRef = useRef(activeSessionId)
+
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId
+  }, [activeSessionId])
 
   // Auto-scroll to bottom whenever messages change
   useEffect(() => {
@@ -38,10 +44,12 @@ function Chat() {
       sessionId = session.id
       skipLoadRef.current = true
       setActiveSessionId(session.id)
+      activeSessionIdRef.current = session.id
     }
 
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setLoading(true)
+    const requestSessionId = sessionId
 
     // Optimistically update the session title from the first user message
     const currentSession = sessions.find(s => s.id === sessionId)
@@ -58,6 +66,8 @@ function Chat() {
         sessionId,
       })
 
+      if (activeSessionIdRef.current !== requestSessionId) return
+
       setMessages((prev) => [
         ...prev,
         {
@@ -70,10 +80,13 @@ function Chat() {
       fetchSessions()
     } catch (err) {
       console.error('Error:', err)
+      if (activeSessionIdRef.current !== requestSessionId) return
       setError('Failed to get a response. Please try again.')
       setMessages((prev) => prev.slice(0, -1))
     } finally {
-      setLoading(false)
+      if (activeSessionIdRef.current === requestSessionId) {
+        setLoading(false)
+      }
     }
   }
 
@@ -84,6 +97,99 @@ function Chat() {
     }
   }
 
+  // ── Regenerate: re-send last user message ───────────
+  const handleRegenerate = async () => {
+    const requestSessionId = activeSessionId
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
+    if (!requestSessionId || !lastUserMsg || loading) return
+
+    const backupMessages = [...messages]
+
+    // Optimistic: remove last assistant message
+    setMessages((prev) => {
+      const lastAsstIdx = prev.reduce((last, m, i) => (m.role === 'assistant' ? i : last), -1)
+      if (lastAsstIdx === -1) return prev
+      return prev.filter((_, i) => i !== lastAsstIdx)
+    })
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await aiAPI.process({
+        input: lastUserMsg.content,
+        strategy: 'ai-powered',
+        requiredCapabilities: ['text-generation'],
+        sessionId: requestSessionId,
+      })
+
+      if (activeSessionIdRef.current !== requestSessionId) return
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: response.data.output,
+          model: response.data.model,
+        },
+      ])
+      fetchSessions()
+    } catch {
+      if (activeSessionIdRef.current !== requestSessionId) return
+      setMessages(backupMessages)
+      setError('Regeneration failed. Try again.')
+    } finally {
+      if (activeSessionIdRef.current === requestSessionId) {
+        setLoading(false)
+      }
+    }
+  }
+
+  // ── Edit: truncate conversation and resend ──────────
+  const handleEdit = async (messageIndex, newContent) => {
+    const requestSessionId = activeSessionId
+    if (!requestSessionId || loading) return
+
+    const backupMessages = [...messages]
+
+    // Remove all messages after the edited one, update the edited message
+    setMessages((prev) => {
+      const truncated = prev.slice(0, messageIndex)
+      return [...truncated, { ...prev[messageIndex], content: newContent }]
+    })
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await aiAPI.process({
+        input: newContent,
+        strategy: 'ai-powered',
+        requiredCapabilities: ['text-generation'],
+        sessionId: requestSessionId,
+      })
+
+      if (activeSessionIdRef.current !== requestSessionId) return
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: response.data.output,
+          model: response.data.model,
+        },
+      ])
+      fetchSessions()
+    } catch {
+      if (activeSessionIdRef.current !== requestSessionId) return
+      setMessages(backupMessages)
+      setError('Failed to get response. Try again.')
+    } finally {
+      if (activeSessionIdRef.current === requestSessionId) {
+        setLoading(false)
+      }
+    }
+  }
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
 
@@ -102,33 +208,21 @@ function Chat() {
               </p>
             </div>
           )}
-
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
-                  <Bot size={16} className="text-white" />
-                </div>
-              )}
-              <div className={`max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                  msg.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-sm'
-                    : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm'
-                }`}>
-                  {msg.content}
-                </div>
-                {msg.role === 'assistant' && msg.model && (
-                  <span className="text-xs text-gray-400 ml-1">via {msg.model}</span>
-                )}
-              </div>
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mt-1">
-                  <User size={16} className="text-gray-600" />
-                </div>
-              )}
-            </div>
-          ))}
+          {messages.map((msg, index) => {
+            const lastAssistantIndex = messages.reduce(
+              (last, m, i) => (m.role === 'assistant' ? i : last), -1
+            )
+            return (
+              <MessageBubble
+                key={msg.timestamp ||index}
+                message={msg}
+                isLast={index === messages.length - 1}
+                isLastAssistant={index === lastAssistantIndex}
+                onRegenerate={handleRegenerate}
+                onEdit= {(newContent)=> handleEdit(index,newContent)}
+              />
+            )
+          })}
 
           {loading && (
             <div className="flex gap-3 justify-start">

@@ -1,6 +1,8 @@
 const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
+const { testConnection } = require('./data/db')
+const { loadModels } = require('./data/models')
 
 const app= express()
 const PORT = process.env.PORT ||5000
@@ -31,6 +33,18 @@ app.get('/', (req, res) => {
   })
 })
 
-app.listen(PORT, ()=>{
-        console.log(`Server is running on http://localhost:${PORT}`)
-})
+async function start() {
+  const dbOk = await testConnection()
+  if (!dbOk) {
+    console.error('⚠️  Server starting WITHOUT database — some features will fail')
+  } else {
+    await loadModels()
+    console.log('📦 Models loaded from database')
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`)
+  })
+}
+
+start()

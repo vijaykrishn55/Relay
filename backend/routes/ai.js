@@ -6,17 +6,24 @@ const CerebrasProvider = require('../services/cerebrasProvider')
 const GroqProvider = require('../services/groqProvider')
 const CohereProvider = require('../services/cohereProvider')
 const ConversationMemory = require('../services/conversationMemory')
-const models = require('../data/models')
-const {addMessage}= require('../data/sessions')
+const { getModelsSync, loadModels } = require('../data/models')
+const { addMessage } = require('../data/sessions')
 
 const mistralProvider = new MistralProvider()
 const cerebrasProvider = new CerebrasProvider()
 const groqProvider = new GroqProvider()
 const cohereProvider = new CohereProvider()
 
-// Conversation memory uses Compound Mini (id 9) to extract summaries
-const routerModel = models.find(m => m.id === 9)
-const conversationMemory = new ConversationMemory(groqProvider, routerModel)
+// Lazy-init: routerModel resolved at first request
+let conversationMemory = null
+
+function getConversationMemory(models) {
+  if (!conversationMemory) {
+    const routerModel = models.find(m => m.id === 9)
+    conversationMemory = new ConversationMemory(groqProvider, routerModel)
+  }
+  return conversationMemory
+}
 
 router.post('/process', async (req, res) => {
   try {
@@ -26,10 +33,13 @@ router.post('/process', async (req, res) => {
       return res.status(400).json({ error: 'Input is required' })
     }
 
+    const models = await loadModels()
+    const memory = getConversationMemory(models)
+
     // Build conversation context from stored summaries
     let systemContext = null
     if (sessionId) {
-      systemContext = conversationMemory.buildContext(sessionId)
+      systemContext = await memory.buildContext(sessionId)
       if (systemContext) {
         console.log(`📝 Loaded conversation context for session ${sessionId}`)
       }
@@ -70,15 +80,11 @@ router.post('/process', async (req, res) => {
         throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
     }
 
-    // Record the exchange summary in the background (non-blocking)
-    if(sessionId){
-      addMessage(sessionId, {role: 'user', content: input})
-      addMessage(sessionId, {role: 'assistant', content: response.output, model: selectedModel.name})
-    }
-    
-    // record the exchange summary in background (non-blocking)
+    // Record messages to DB (non-blocking)
     if (sessionId) {
-      conversationMemory.recordExchange(sessionId, input, response.output, selectedModel.name)
+      await addMessage(sessionId, {role: 'user', content: input})
+      await addMessage(sessionId, {role: 'assistant', content: response.output, model: selectedModel.name})
+      memory.recordExchange(sessionId, input, response.output, selectedModel.name)
     }
     
     res.json({

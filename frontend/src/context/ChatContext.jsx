@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, useCallback } from 'react'
+import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSessions } from '../hooks/useSessions'
 import { aiAPI, sessionsAPI } from '../services/api'
@@ -13,7 +13,13 @@ export function ChatProvider({ children }) {
   const [activeSessionId, setActiveSessionId] = useState(null)
   const skipLoadRef = useRef(false)
   const bottomRef = useRef(null)
+  const activeSessionRef = useRef(null)
+  const loadRequestRef = useRef(0)
   const navigate = useNavigate()
+  useEffect(() => {
+    activeSessionRef.current = activeSessionId
+  }, [activeSessionId])
+
 
   const { sessions, fetchSessions, createSession, renameSession, deleteSession, updateLocalTitle } = useSessions()
 
@@ -28,6 +34,7 @@ export function ChatProvider({ children }) {
 
   const handleSelectSession = useCallback((id) => {
     setActiveSessionId(id)
+    setMessages([])
     setError('')
     navigate('/chat')
   }, [navigate])
@@ -46,11 +53,16 @@ export function ChatProvider({ children }) {
   const loadSession = useCallback(async (id) => {
     if (!id) return
     if (skipLoadRef.current) { skipLoadRef.current = false; return }
+    const requestId = ++loadRequestRef.current
     try {
       const res = await sessionsAPI.getById(id)
+      if (requestId !== loadRequestRef.current) return
+      if (activeSessionRef.current !== id) return
       setMessages(res.data.messages || [])
     } catch {
-      setError('Failed to load session.')
+      if (requestId === loadRequestRef.current) {
+        setError('Failed to load session.')
+      }
     }
   }, [])
 

@@ -1,11 +1,11 @@
 const GroqProvider = require("./groqProvider");
-const models = require("../data/models");
+const { getModelsSync } = require("../data/models");
 const AIRouter = require("./router");
 
 class AIRouterService {
   constructor() {
         this.groqProvider = new GroqProvider();
-        this.routerModel = models.find(m => m.id === 9);
+        this.routerModel = getModelsSync().find(m => m.id === 9);
   }
 
   generatePrompt(userQuestion, availableModels){

@@ -1,4 +1,7 @@
-const models = [
+const { query } = require('./db')
+
+// Static fallback — used only if DB fetch fails on startup
+const staticModels = [
   // Mistral
   {
     id: 2,
@@ -174,4 +177,38 @@ const models = [
   }
 ]
 
-module.exports = models
+// Cached models from DB
+let cachedModels = null
+
+async function loadModels() {
+  try {
+    const rows = await query('SELECT * FROM models')
+    if (rows.length === 0) return staticModels
+
+    cachedModels = rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      provider: r.provider,
+      status: r.status,
+      capabilities: typeof r.capabilities === 'string' ? JSON.parse(r.capabilities) : r.capabilities,
+      costPer1k: parseFloat(r.cost_per_1k),
+      avgLatency: r.avg_latency,
+      rateLimit: typeof r.rate_limit === 'string' ? JSON.parse(r.rate_limit) : r.rate_limit,
+      contextWindow: r.context_window,
+      maxOutputTokens: r.max_output_tokens,
+      endpoint: r.endpoint,
+      model_id: r.model_id,
+      apiProvider: r.api_provider
+    }))
+    return cachedModels
+  } catch (error) {
+    console.warn('⚠️ Failed to load models from DB, using static fallback:', error.message)
+    return staticModels
+  }
+}
+
+function getModelsSync() {
+  return cachedModels || staticModels
+}
+
+module.exports = { loadModels, getModelsSync, staticModels }
