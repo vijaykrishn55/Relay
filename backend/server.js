@@ -3,7 +3,7 @@ const cors = require('cors')
 require('dotenv').config()
 const { testConnection } = require('./data/db')
 const { loadModels } = require('./data/models')
-
+const memoryRoutes = require('./routes/memory')
 const app= express()
 const PORT = process.env.PORT ||5000
 
@@ -19,6 +19,7 @@ app.use('/api/models', modelsRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/sessions', sessionsRoutes)
+app.use('/api/memory', memoryRoutes)
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -28,7 +29,8 @@ app.get('/', (req, res) => {
       '/api/models',
       '/api/analytics/dashboard',
       '/api/ai/process',
-      '/api/sessions'
+      '/api/sessions',
+      '/api/memory'
     ]
   })
 })

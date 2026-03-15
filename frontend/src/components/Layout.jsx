@@ -1,5 +1,5 @@
 import {Link, useLocation} from 'react-router-dom';
-import {LayoutDashboard, MessageSquare, Database} from 'lucide-react';
+import {LayoutDashboard, MessageSquare, Database, Brain} from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 import SessionList from './SessionList';
 
@@ -19,6 +19,7 @@ function Layout({children}) {
                 {path:'/', icon: LayoutDashboard, label:'Dashboard'},
                 {path:'/chat', icon: MessageSquare, label:'Chat'},
                 {path:'/models', icon: Database, label:'Models'},
+                {path:'/memory', icon: Brain, label:'Memory'},
         ]
 
         return(

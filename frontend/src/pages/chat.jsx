@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
-import { Send, Loader, AlertCircle, Bot, User } from "lucide-react";
-import { aiAPI } from "../services/api";
+import { useState, useEffect, useRef } from "react";
+import { Send, Loader, AlertCircle, Bot, BookmarkPlus, ArrowRightCircle, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { aiAPI, sessionsAPI, memoryAPI } from "../services/api";
 import { useChat } from '../context/ChatContext'
 import MessageBubble from "../components/MessageBubble";
 
@@ -20,14 +20,51 @@ function Chat() {
     activeSessionIdRef.current = activeSessionId
   }, [activeSessionId])
 
+  // Context-seeded session state
+  const [contextCollapsed, setContextCollapsed] = useState(false)
+  const [contextMessages, setContextMessages] = useState([])
+
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIndices, setSelectedIndices] = useState(new Set())
+
+  // Toggle selection mode on/off
+  const toggleSelectionMode = () => {
+    setSelectionMode(prev => !prev)
+    setSelectedIndices(new Set())
+  }
+
+  // Toggle a single message selection
+  const handleToggleSelect = (index) => {
+    setSelectedIndices(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
+
   // Auto-scroll to bottom whenever messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Load messages when switching sessions
+  // Load messages + context when switching sessions
   useEffect(() => {
+    if (!activeSessionId) {
+      setContextMessages([])
+      return
+    }
     loadSession(activeSessionId)
+    // Also load context_messages for this session
+    sessionsAPI.getById(activeSessionId).then(res => {
+      setContextMessages(res.data.context_messages || [])
+    }).catch(() => {
+      setContextMessages([])
+    })
   }, [activeSessionId, loadSession])
 
   const handleSubmit = async (e) => {
@@ -190,8 +227,83 @@ function Chat() {
       }
     }
   }
+
+  // ── Save selected messages to memory bank ───────────
+  const handleSaveToMemory = async () => {
+    const selectedMessages = Array.from(selectedIndices)
+      .sort((a, b) => a - b)
+      .map(i => messages[i])
+
+    try {
+      for (const msg of selectedMessages) {
+        await memoryAPI.create({
+          content: msg.content,
+          source_session_id: activeSessionId,
+          source_message_index: messages.indexOf(msg),
+          tags: [msg.role]
+        })
+      }
+
+      setSelectionMode(false)
+      setSelectedIndices(new Set())
+      alert(`${selectedMessages.length} message(s) saved to memory!`)
+    } catch (err) {
+      console.error('Failed to save to memory:', err)
+      setError('Failed to save messages to memory.')
+    }
+  }
+
+  // ── Start a new session pre-loaded with selected messages as context ──
+  const handleStartContextSession = async () => {
+    const ctxMessages = Array.from(selectedIndices)
+      .sort((a, b) => a - b)
+      .map(i => ({
+        role: messages[i].role,
+        content: messages[i].content,
+        model: messages[i].model || null
+      }))
+
+    try {
+      const res = await sessionsAPI.createWithContext(ctxMessages)
+      const newSession = res.data
+
+      // Skip the auto-load in ChatContext so it doesn't overwrite our state
+      skipLoadRef.current = true
+      setActiveSessionId(newSession.id)
+      setMessages([])
+      // Set context messages immediately — we already have them
+      setContextMessages(newSession.context_messages || ctxMessages)
+      setSelectionMode(false)
+      setSelectedIndices(new Set())
+      fetchSessions()
+    } catch (err) {
+      console.error('Failed to create context session:', err)
+      setError('Failed to create new session with context.')
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+
+      {/* Chat header with selection toggle */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+        <h2 className="text-sm font-medium text-gray-600">
+          {selectionMode
+            ? `${selectedIndices.size} message${selectedIndices.size !== 1 ? 's' : ''} selected`
+            : 'Chat'
+          }
+        </h2>
+        <button
+          onClick={toggleSelectionMode}
+          className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+            selectionMode
+              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          {selectionMode ? 'Cancel' : 'Select'}
+        </button>
+      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
@@ -208,18 +320,50 @@ function Chat() {
               </p>
             </div>
           )}
+
+          {/* Context messages from parent session */}
+          {contextMessages && contextMessages.length > 0 && (
+            <div className="mb-6 border border-purple-200 rounded-xl overflow-hidden bg-purple-50/50">
+              <button
+                onClick={() => setContextCollapsed(!contextCollapsed)}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-purple-700 hover:bg-purple-100/50 transition-colors"
+              >
+                <Layers size={14} />
+                Context from previous session ({contextMessages.length} messages)
+                {contextCollapsed ? <ChevronRight size={14} className="ml-auto" /> : <ChevronDown size={14} className="ml-auto" />}
+              </button>
+
+              {!contextCollapsed && (
+                <div className="px-4 pb-3 space-y-2">
+                  {contextMessages.map((msg, i) => (
+                    <div key={i} className="text-xs text-purple-800 bg-white/60 rounded-lg px-3 py-2 border border-purple-100">
+                      <span className="font-semibold text-purple-600 uppercase text-[10px] tracking-wider">
+                        {msg.role}
+                      </span>
+                      <p className="mt-0.5 whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {messages.map((msg, index) => {
             const lastAssistantIndex = messages.reduce(
               (last, m, i) => (m.role === 'assistant' ? i : last), -1
             )
             return (
               <MessageBubble
-                key={msg.timestamp ||index}
+                key={msg.timestamp || index}
                 message={msg}
+                index={index}
                 isLast={index === messages.length - 1}
                 isLastAssistant={index === lastAssistantIndex}
                 onRegenerate={handleRegenerate}
-                onEdit= {(newContent)=> handleEdit(index,newContent)}
+                onEdit={(newContent) => handleEdit(index, newContent)}
+                selectionMode={selectionMode}
+                isSelected={selectedIndices.has(index)}
+                onToggleSelect={handleToggleSelect}
               />
             )
           })}
@@ -249,6 +393,33 @@ function Chat() {
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
             <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
             <span className="text-red-600 text-sm">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Selection action bar — shown when messages are selected */}
+      {selectionMode && selectedIndices.size > 0 && (
+        <div className="border-t border-gray-200 bg-white px-4 py-3">
+          <div className="max-w-3xl mx-auto flex items-center justify-between">
+            <span className="text-sm text-gray-600">
+              {selectedIndices.size} message{selectedIndices.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveToMemory}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
+              >
+                <BookmarkPlus size={14} />
+                Save to Memory
+              </button>
+              <button
+                onClick={handleStartContextSession}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <ArrowRightCircle size={14} />
+                New Chat with Context
+              </button>
+            </div>
           </div>
         </div>
       )}

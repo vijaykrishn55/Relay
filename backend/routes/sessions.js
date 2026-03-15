@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const{
         createSession,
+        createSessionWithContext,
         getSession,
         getAllSessions,
         updateSession,
@@ -18,6 +19,21 @@ router.get('/', async (req, res) => {
         } catch (error) {
                 res.status(500).json({ error: error.message })
         }
+})
+
+// POST /api/sessions/with-context — create a session pre-loaded with context messages
+router.post('/with-context', async (req, res) => {
+  try {
+    const { contextMessages } = req.body
+    if (!contextMessages || !Array.isArray(contextMessages) || contextMessages.length === 0) {
+      return res.status(400).json({ error: 'contextMessages array is required' })
+    }
+    const session = await createSessionWithContext(contextMessages)
+    res.status(201).json(session)
+  } catch (err) {
+    console.error('Failed to create context session:', err)
+    res.status(500).json({ error: 'Failed to create session' })
+  }
 })
 
 // GET /api/sessions/:id - get a single session with messages

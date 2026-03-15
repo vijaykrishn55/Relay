@@ -7,7 +7,8 @@ const GroqProvider = require('../services/groqProvider')
 const CohereProvider = require('../services/cohereProvider')
 const ConversationMemory = require('../services/conversationMemory')
 const { getModelsSync, loadModels } = require('../data/models')
-const { addMessage } = require('../data/sessions')
+const { addMessage, getSession } = require('../data/sessions')
+const memoryService = require('../services/memoryService')
 
 const mistralProvider = new MistralProvider()
 const cerebrasProvider = new CerebrasProvider()
@@ -45,6 +46,24 @@ router.post('/process', async (req, res) => {
       }
     }
 
+    // Build memory context from saved memories
+    const memoryContext = await memoryService.buildMemoryContext(input)
+
+    // Load context messages if session has them (context-seeded sessions)
+    let contextPrefix = ''
+    if (sessionId) {
+      const session = await getSession(sessionId)
+      if (session && session.context_messages && session.context_messages.length > 0) {
+        const contextBlock = session.context_messages
+          .map(m => `[${m.role}]: ${m.content}`)
+          .join('\n')
+        contextPrefix = `\n\n[Context from a previous conversation — the user selected these messages as relevant]\n${contextBlock}\n`
+      }
+    }
+
+    // Combine all context sources
+    const fullSystemContext = (systemContext || '') + contextPrefix + memoryContext
+
     const aiRouter = new AIRouter(models)
 
     const selectedModel = await aiRouter.selectModel({
@@ -65,16 +84,16 @@ router.post('/process', async (req, res) => {
 
     switch (selectedModel.apiProvider) {
       case 'mistral':
-        response = await mistralProvider.callModel(selectedModel, input, systemContext)
+        response = await mistralProvider.callModel(selectedModel, input, fullSystemContext)
         break
       case 'cerebras':
-        response = await cerebrasProvider.callModel(selectedModel, input, systemContext)
+        response = await cerebrasProvider.callModel(selectedModel, input, fullSystemContext)
         break
       case 'groq':
-        response = await groqProvider.callModel(selectedModel, input, systemContext)
+        response = await groqProvider.callModel(selectedModel, input, fullSystemContext)
         break
       case 'cohere':
-        response = await cohereProvider.callModel(selectedModel, input, systemContext)
+        response = await cohereProvider.callModel(selectedModel, input, fullSystemContext)
         break
       default:
         throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
@@ -86,7 +105,7 @@ router.post('/process', async (req, res) => {
       await addMessage(sessionId, {role: 'assistant', content: response.output, model: selectedModel.name})
       memory.recordExchange(sessionId, input, response.output, selectedModel.name)
     }
-    
+
     res.json({
       success: true,
       input,

@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_messages_session ON messages(session_id, timestamp);
+-- Only create if it doesn't already exist
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'messages' AND index_name = 'idx_messages_session');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_messages_session ON messages(session_id, timestamp)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================
 -- 3. MODELS — replaces hardcoded models array
@@ -62,7 +67,11 @@ CREATE TABLE IF NOT EXISTS request_history (
     timestamp   BIGINT       NOT NULL      -- epoch ms
 );
 
-CREATE INDEX idx_request_history_ts ON request_history(timestamp);
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'request_history' AND index_name = 'idx_request_history_ts');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_request_history_ts ON request_history(timestamp)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================
 -- 5. CONVERSATION_SUMMARIES — replaces JSON files on disk
@@ -78,12 +87,39 @@ CREATE TABLE IF NOT EXISTS conversation_summaries (
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_conv_summaries_session ON conversation_summaries(session_id, timestamp);
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'conversation_summaries' AND index_name = 'idx_conv_summaries_session');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_conv_summaries_session ON conversation_summaries(session_id, timestamp)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================
--- 6. SEED MODELS — insert the default models
+-- 6. MEMORIES — user-curated facts and insights (Phase 3)
 -- ============================================================
-INSERT INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider) VALUES
+CREATE TABLE IF NOT EXISTS memories (
+  id VARCHAR(36) PRIMARY KEY,
+  content TEXT NOT NULL,
+  source_session_id VARCHAR(36),
+  source_message_index INT,
+  tags JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (source_session_id) REFERENCES sessions(id) ON DELETE SET NULL
+);
+
+-- ============================================================
+-- 7. ADD context_messages COLUMN to sessions (Phase 3)
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sessions' AND column_name = 'context_messages');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE sessions ADD COLUMN context_messages JSON', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 8. SEED MODELS — insert the default models
+-- ============================================================
+INSERT IGNORE INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider) VALUES
 (2,  'Codestral',              'Mistral',  'active', '["text-generation","code","reasoning","documentation"]',     0, 250, '{"rpm":60,"tpm":100000}',                       128000, 128000, 'https://codestral.mistral.ai', 'codestral-latest',                              'mistral'),
 (3,  'Z.AI GLM 4.7',          'Cerebras', 'active', '["text-generation","code","reasoning"]',                     0, 180, '{"rpm":10,"tpm":60000,"rpd":100}',              128000, 128000, 'https://api.cerebras.ai',      'zai-glm-4.7',                                  'cerebras'),
 (4,  'OpenAI GPT OSS',        'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":64000,"rpd":14400}',            128000,  65536, 'https://api.cerebras.ai',      'gpt-oss-120b',                                  'cerebras'),

@@ -25,7 +25,15 @@ export const sessionsAPI = {
   getById: (id) => api.get(`/sessions/${id}`),
   create: () => api.post('/sessions'),
   rename: (id, title) => api.put(`/sessions/${id}`, { title }),
-  delete: (id) => api.delete(`/sessions/${id}`)
+  delete: (id) => api.delete(`/sessions/${id}`),
+  createWithContext: (contextMessages) => api.post('/sessions/with-context', { contextMessages }),
+}
+export const memoryAPI = {
+  getAll: (query)        => api.get('/memory', { params: query ? { q: query } : {} }),
+  getById: (id)          => api.get(`/memory/${id}`),
+  create: (data)         => api.post('/memory', data),
+  update: (id, data)     => api.put(`/memory/${id}`, data),
+  delete: (id)           => api.delete(`/memory/${id}`)
 }
 
 export default api

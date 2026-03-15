@@ -20,9 +20,18 @@ async function getSession(id) {
     [id]
   )
 
+  // mysql2 auto-parses JSON columns — only parse if it's still a string
+  let contextMessages = null
+  if (session.context_messages) {
+    contextMessages = typeof session.context_messages === 'string'
+      ? JSON.parse(session.context_messages)
+      : session.context_messages
+  }
+
   return {
     id: session.id,
     title: session.title,
+    context_messages: contextMessages,
     createdAt: session.created_at,
     updatedAt: session.updated_at,
     messages
@@ -80,4 +89,21 @@ async function addMessage(sessionId, message) {
   return getSession(sessionId)
 }
 
-module.exports = { createSession, getSession, getAllSessions, updateSession, deleteSession, addMessage }
+async function createSessionWithContext(contextMessages) {
+  const id = uuidv4()
+
+  await query(
+    `INSERT INTO sessions (id, title, context_messages, created_at, updated_at)
+     VALUES (?, 'New Chat', ?, NOW(), NOW())`,
+    [id, JSON.stringify(contextMessages)]
+  )
+
+  return {
+    id,
+    title: 'New Chat',
+    context_messages: contextMessages,
+    messages: [],
+    createdAt: new Date().toISOString()
+  }
+}
+module.exports = { createSession,createSessionWithContext, getSession, getAllSessions, updateSession, deleteSession, addMessage }
