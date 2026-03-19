@@ -9,6 +9,22 @@ const{
         deleteSession,
         addMessage
 }= require('../data/sessions')
+const { loadModels } = require('../data/models')
+const GroqProvider = require('../services/groqProvider')
+const PersistentMemoryService = require('../services/persistentMemoryService')
+
+// Lazy-init: persistentMemory resolved at first request
+let persistentMemory = null
+const groqProvider = new GroqProvider()
+
+async function getPersistentMemory() {
+  if (!persistentMemory) {
+    const models = await loadModels()
+    const summarizerModel = models.find(m => m.id === 9) // Compound Mini
+    persistentMemory = new PersistentMemoryService(groqProvider, summarizerModel)
+  }
+  return persistentMemory
+}
 
 // GET /api/sessions - list of all sessions (no messages)
 
@@ -48,9 +64,25 @@ router.get('/:id', async (req, res) => {
 })
 
 // POST /api/sessions - create new session
+// Also triggers summarization of the previous session (Phase 4)
 router.post('/', async (req, res) => {
         try {
                 const session = await createSession()
+
+                // Trigger Phase 4 persistent memory processing (non-blocking)
+                try {
+                        const memory = await getPersistentMemory()
+                        memory.onNewSessionCreated(session.id)
+                                .then(result => {
+                                        if (result.summarizedSessionId) {
+                                                console.log(`🧠 Phase 4: Processing previous session ${result.summarizedSessionId}`)
+                                        }
+                                })
+                                .catch(err => console.error('Phase 4 processing error:', err.message))
+                } catch (memErr) {
+                        console.error('Failed to init persistent memory:', memErr.message)
+                }
+
                 res.status(201).json(session)
         } catch (error) {
                 res.status(500).json({ error: error.message })

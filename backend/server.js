@@ -14,15 +14,17 @@ const modelsRoutes = require('./routes/models')
 const analyticsRoutes = require('./routes/analytics')
 const aiRoutes = require('./routes/ai')
 const sessionsRoutes = require('.//routes/sessions')
+const profileRoutes = require('./routes/profile')
 
 app.use('/api/models', modelsRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/sessions', sessionsRoutes)
 app.use('/api/memory', memoryRoutes)
+app.use('/api/profile', profileRoutes)
 
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Relay API is running!',
     version: '1.0.0',
     endpoints: [
@@ -30,7 +32,8 @@ app.get('/', (req, res) => {
       '/api/analytics/dashboard',
       '/api/ai/process',
       '/api/sessions',
-      '/api/memory'
+      '/api/memory',
+      '/api/profile'
     ]
   })
 })

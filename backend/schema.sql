@@ -131,3 +131,41 @@ INSERT IGNORE INTO models (id, name, provider, status, capabilities, cost_per_1k
 (10, 'Compound',              'Groq',     'active', '["text-generation","reasoning"]',                            0, 140, '{"rpm":30,"rpd":250,"tpm":70000}',              131072,  8192,  'https://api.groq.com',         'groq/compound',                                 'groq'),
 (11, 'Command A Reasoning',   'Cohere',   'active', '["text-generation","reasoning","analysis"]',                 0, 300, '{"rpm":20,"tpm":40000}',                        256000, 32000,  'https://api.cohere.ai',        'command-a-reasoning-08-2025',                   'cohere'),
 (12, 'Command R Plus',        'Cohere',   'active', '["text-generation","reasoning","multilingual"]',             0, 280, '{"rpm":20,"tpm":40000}',                        128000,  4000,  'https://api.cohere.ai',        'command-r-plus-08-2024',                        'cohere');
+
+-- ============================================================
+-- 9. USER_PROFILES — Phase 4: Accumulated user understanding
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id                INT          PRIMARY KEY DEFAULT 1,  -- Single user for now
+    name              VARCHAR(255) DEFAULT NULL,           -- User's name if shared
+    preferences       JSON         DEFAULT NULL,           -- Communication preferences
+    interests         JSON         DEFAULT NULL,           -- Recurring topics/interests
+    behavior_patterns JSON         DEFAULT NULL,           -- How the user interacts
+    personal_facts    JSON         DEFAULT NULL,           -- Facts about the user
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Insert default empty profile (single user assumption)
+INSERT IGNORE INTO user_profiles (id) VALUES (1);
+
+-- ============================================================
+-- 10. SESSION_SUMMARIES — Phase 4: Comprehensive session snapshots
+-- ============================================================
+CREATE TABLE IF NOT EXISTS session_summaries (
+    id                INT          AUTO_INCREMENT PRIMARY KEY,
+    session_id        VARCHAR(36)  NOT NULL UNIQUE,        -- One summary per session
+    summary           TEXT         NOT NULL,               -- Comprehensive narrative
+    topics            JSON         DEFAULT NULL,           -- List of topics covered
+    outcomes          JSON         DEFAULT NULL,           -- Decisions/solutions reached
+    user_info_extracted JSON       DEFAULT NULL,           -- New info learned about user
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'session_summaries' AND index_name = 'idx_session_summaries_session');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_session_summaries_session ON session_summaries(session_id)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

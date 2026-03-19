@@ -6,6 +6,7 @@ const CerebrasProvider = require('../services/cerebrasProvider')
 const GroqProvider = require('../services/groqProvider')
 const CohereProvider = require('../services/cohereProvider')
 const ConversationMemory = require('../services/conversationMemory')
+const PersistentMemoryService = require('../services/persistentMemoryService')
 const { getModelsSync, loadModels } = require('../data/models')
 const { addMessage, getSession } = require('../data/sessions')
 const memoryService = require('../services/memoryService')
@@ -17,6 +18,7 @@ const cohereProvider = new CohereProvider()
 
 // Lazy-init: routerModel resolved at first request
 let conversationMemory = null
+let persistentMemory = null
 
 function getConversationMemory(models) {
   if (!conversationMemory) {
@@ -24,6 +26,14 @@ function getConversationMemory(models) {
     conversationMemory = new ConversationMemory(groqProvider, routerModel)
   }
   return conversationMemory
+}
+
+function getPersistentMemory(models) {
+  if (!persistentMemory) {
+    const summarizerModel = models.find(m => m.id === 9)
+    persistentMemory = new PersistentMemoryService(groqProvider, summarizerModel)
+  }
+  return persistentMemory
 }
 
 router.post('/process', async (req, res) => {
@@ -36,6 +46,20 @@ router.post('/process', async (req, res) => {
 
     const models = await loadModels()
     const memory = getConversationMemory(models)
+    const persistent = getPersistentMemory(models)
+
+    // Phase 4: Build persistent context (user profile + last session summary)
+    let persistentContext = ''
+    if (sessionId) {
+      try {
+        persistentContext = await persistent.buildPersistentContext(sessionId)
+        if (persistentContext) {
+          console.log(`🧠 Loaded persistent memory context for session ${sessionId}`)
+        }
+      } catch (err) {
+        console.error('Failed to load persistent context:', err.message)
+      }
+    }
 
     // Build conversation context from stored summaries
     let systemContext = null
@@ -46,7 +70,7 @@ router.post('/process', async (req, res) => {
       }
     }
 
-    // Build memory context from saved memories
+    // Build memory context from saved memories (Phase 3)
     const memoryContext = await memoryService.buildMemoryContext(input)
 
     // Load context messages if session has them (context-seeded sessions)
@@ -61,8 +85,8 @@ router.post('/process', async (req, res) => {
       }
     }
 
-    // Combine all context sources
-    const fullSystemContext = (systemContext || '') + contextPrefix + memoryContext
+    // Combine all context sources (Phase 4 persistent context goes first)
+    const fullSystemContext = persistentContext + (systemContext || '') + contextPrefix + memoryContext
 
     const aiRouter = new AIRouter(models)
 

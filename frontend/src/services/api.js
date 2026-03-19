@@ -36,4 +36,17 @@ export const memoryAPI = {
   delete: (id)           => api.delete(`/memory/${id}`)
 }
 
+// Phase 4: Persistent Memory API
+export const profileAPI = {
+  // User profile endpoints
+  get: () => api.get('/profile'),
+  update: (data) => api.put('/profile', data),
+  clear: () => api.delete('/profile'),
+
+  // Session summaries endpoints
+  getSummaries: () => api.get('/profile/summaries'),
+  getSummary: (sessionId) => api.get(`/profile/summaries/${sessionId}`),
+  generateSummary: (sessionId) => api.post(`/profile/summaries/${sessionId}`)
+}
+
 export default api
