@@ -354,7 +354,7 @@ function Chat() {
             )
             return (
               <MessageBubble
-                key={msg.timestamp || index}
+                key={`${msg.timestamp || 'msg'}-${index}`}
                 message={msg}
                 index={index}
                 isLast={index === messages.length - 1}
