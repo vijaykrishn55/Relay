@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Loader, AlertCircle, Bot, BookmarkPlus, ArrowRightCircle, ChevronDown, ChevronRight, Layers } from "lucide-react";
-import { aiAPI, sessionsAPI, memoryAPI } from "../services/api";
+import { Send, Loader, AlertCircle, Bot, BookmarkPlus, ArrowRightCircle, ChevronDown, ChevronRight, Layers, CornerDownRight, GitBranch, MessageSquare } from "lucide-react";
+import { aiAPI, sessionsAPI, memoryAPI, relayAPI } from "../services/api";
 import { useChat } from '../context/ChatContext'
 import MessageBubble from "../components/MessageBubble";
+import RelayChip from "../components/RelayChip";
 
 function Chat() {
   const {
@@ -27,6 +28,12 @@ function Chat() {
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIndices, setSelectedIndices] = useState(new Set())
+
+  // Relay state
+  const [relayTarget, setRelayTarget] = useState(null) // { index, message, originalQuestion }
+  const [relayTopics, setRelayTopics] = useState([])
+  const [relayTopicsLoading, setRelayTopicsLoading] = useState(false)
+  const [relayTopicsExpanded, setRelayTopicsExpanded] = useState(false)
 
   // Toggle selection mode on/off
   const toggleSelectionMode = () => {
@@ -74,6 +81,12 @@ function Chat() {
     const userMessage = input.trim()
     setInput('')
     setError('')
+
+    // ── If relay target is set, AI decides: follow-up or new session ──
+    if (relayTarget) {
+      await handleRelaySmart(userMessage)
+      return
+    }
 
     let sessionId = activeSessionId
     if (!sessionId) {
@@ -282,6 +295,164 @@ function Chat() {
     }
   }
 
+  // ── Relay: Toggle — auto-target last assistant response + fetch topics ──
+  const handleRelayToggle = async () => {
+    if (relayTarget) {
+      // already active → cancel
+      setRelayTarget(null)
+      setRelayTopics([])
+      setRelayTopicsExpanded(false)
+      return
+    }
+
+    // Find last assistant message
+    let lastAssistantIdx = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        lastAssistantIdx = i
+        break
+      }
+    }
+    if (lastAssistantIdx === -1) return
+
+    const targetMsg = messages[lastAssistantIdx]
+
+    // Find the user question that preceded this response
+    let originalQuestion = ''
+    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        originalQuestion = messages[i].content
+        break
+      }
+    }
+
+    setRelayTarget({
+      index: lastAssistantIdx,
+      message: targetMsg,
+      originalQuestion
+    })
+    setRelayTopicsExpanded(false)
+
+    // Cancel selection mode if active
+    if (selectionMode) {
+      setSelectionMode(false)
+      setSelectedIndices(new Set())
+    }
+
+    // Fetch topics in background (only if enough messages)
+    if (activeSessionId && messages.length >= 4) {
+      setRelayTopicsLoading(true)
+      try {
+        const res = await relayAPI.getTopics(activeSessionId)
+        setRelayTopics(res.data.topics || [])
+      } catch (err) {
+        console.error('Failed to extract topics:', err)
+        // non-blocking — topics are optional suggestions
+      } finally {
+        setRelayTopicsLoading(false)
+      }
+    }
+  }
+
+  // ── Relay: Smart — AI classifies intent and auto-routes ──
+  const handleRelaySmart = async (userInput) => {
+    const { index, message, originalQuestion } = relayTarget
+    const requestSessionId = activeSessionId
+
+    if (!requestSessionId) return
+
+    // Save backup for rollback
+    const backupMessages = [...messages]
+
+    // Clear relay
+    setRelayTarget(null)
+    setRelayTopics([])
+    setRelayTopicsExpanded(false)
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await relayAPI.smart({
+        sessionId: requestSessionId,
+        targetMessageIndex: index,
+        originalQuestion,
+        originalResponse: message.content,
+        userInput
+      })
+
+      if (activeSessionIdRef.current !== requestSessionId) return
+
+      const { action } = response.data
+
+      if (action === 'follow_up') {
+        // Update the target message IN-PLACE (no new bubble)
+        setMessages(prev => prev.map((msg, i) =>
+          i === index
+            ? { ...msg, content: response.data.output, model: response.data.model, relayUpdated: true }
+            : msg
+        ))
+      } else if (action === 'new_session') {
+        if (response.data.error === 'no_matches') {
+          setError(`No messages found about "${response.data.topic}". Try a different topic.`)
+          setMessages(backupMessages)
+          return
+        }
+
+        // Switch to the new session the backend created
+        const newSession = response.data.newSession
+        skipLoadRef.current = true
+        setActiveSessionId(newSession.id)
+        setMessages([])
+        setContextMessages(newSession.context_messages || [])
+        fetchSessions()
+      }
+
+    } catch (err) {
+      console.error('Smart relay failed:', err)
+      if (activeSessionIdRef.current !== requestSessionId) return
+      setMessages(backupMessages)
+      setError('Relay failed. Try again.')
+    } finally {
+      if (activeSessionIdRef.current === requestSessionId) {
+        setLoading(false)
+      }
+    }
+  }
+
+  // ── Relay: Branch into a new session with topic context ──
+  const handleRelayTopicSelect = async (topic) => {
+    const contextMsgs = topic.messageIndices
+      .sort((a, b) => a - b)
+      .filter(i => i >= 0 && i < messages.length)
+      .map(i => ({
+        role: messages[i].role,
+        content: messages[i].content,
+        model: messages[i].model || null
+      }))
+
+    if (contextMsgs.length === 0) {
+      setError('No valid messages for this topic.')
+      return
+    }
+
+    try {
+      const res = await sessionsAPI.createWithContext(contextMsgs)
+      const newSession = res.data
+
+      skipLoadRef.current = true
+      setActiveSessionId(newSession.id)
+      setMessages([])
+      setContextMessages(newSession.context_messages || contextMsgs)
+      setRelayTarget(null)
+      setRelayTopics([])
+      setRelayTopicsExpanded(false)
+      fetchSessions()
+    } catch (err) {
+      console.error('Failed to create topic session:', err)
+      setError('Failed to create new session from topic.')
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
 
@@ -427,7 +598,70 @@ function Chat() {
       {/* Input bar */}
       <div className="border-t border-gray-200 bg-white px-4 py-4">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+          {/* Relay chip — shows when a target is selected */}
+          <RelayChip
+            targetMessage={relayTarget?.message}
+            onClear={() => {
+              setRelayTarget(null)
+              setRelayTopics([])
+              setRelayTopicsExpanded(false)
+            }}
+          />
+
+          {/* Suggested topics drop-up — collapsible, shown when relay is active */}
+          {relayTarget && (relayTopics.length > 0 || relayTopicsLoading) && (
+            <div className="mb-2">
+              <button
+                type="button"
+                onClick={() => setRelayTopicsExpanded(!relayTopicsExpanded)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+              >
+                <GitBranch size={12} />
+                {relayTopicsLoading ? 'Finding topics...' : `${relayTopics.length} suggested topic${relayTopics.length !== 1 ? 's' : ''} to branch`}
+                {relayTopicsExpanded ? <ChevronDown size={12} className="ml-auto" /> : <ChevronRight size={12} className="ml-auto" />}
+              </button>
+
+              {relayTopicsExpanded && !relayTopicsLoading && (
+                <div className="px-1 pb-2 space-y-1.5">
+                  {relayTopics.map((topic, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleRelayTopicSelect(topic)}
+                      className="w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-800">{topic.name}</span>
+                        <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                          <MessageSquare size={9} />
+                          {topic.messageIndices.length}
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{topic.description}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-end gap-3 bg-gray-100 rounded-2xl px-4 py-3">
+            {/* Single Relay button */}
+            {messages.some(m => m.role === 'assistant') && (
+              <button
+                type="button"
+                onClick={handleRelayToggle}
+                className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                  relayTarget
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                    : 'bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600'
+                }`}
+                title={relayTarget ? 'Cancel relay' : 'Relay: follow up on last response'}
+              >
+                <CornerDownRight size={16} />
+              </button>
+            )}
+
             <textarea
               rows={1}
               className="flex-1 bg-transparent resize-none text-sm text-gray-800 placeholder-gray-400 focus:outline-none max-h-40"
@@ -438,13 +672,17 @@ function Chat() {
                 e.target.style.height = e.target.scrollHeight + 'px'
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Message Relay..."
+              placeholder={relayTarget ? 'Ask a follow-up about this response...' : 'Message Relay...'}
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                relayTarget
+                  ? 'bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300'
+                  : 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300'
+              } disabled:cursor-not-allowed`}
             >
               {loading
                 ? <Loader size={15} className="text-white animate-spin" />
@@ -453,7 +691,10 @@ function Chat() {
             </button>
           </div>
           <p className="text-center text-xs text-gray-400 mt-2">
-            AI router picks the best model for each message automatically
+            {relayTarget
+              ? 'Relay mode: your message will refine the selected response'
+              : 'AI router picks the best model for each message automatically'
+            }
           </p>
         </form>
       </div>

@@ -169,3 +169,18 @@ SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_session_summaries_session ON se
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 11. RELAY TRACKING — Phase 5: Follow-up lineage on messages
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = 'relay_parent_id');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE messages ADD COLUMN relay_parent_id INT DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = 'relay_followups');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE messages ADD COLUMN relay_followups JSON DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

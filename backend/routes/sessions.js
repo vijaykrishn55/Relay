@@ -64,21 +64,21 @@ router.get('/:id', async (req, res) => {
 })
 
 // POST /api/sessions - create new session
-// Also triggers summarization of the previous session (Phase 4)
+// Also triggers summarization of the previous session
 router.post('/', async (req, res) => {
         try {
                 const session = await createSession()
 
-                // Trigger Phase 4 persistent memory processing (non-blocking)
+                // Trigger persistent memory processing (non-blocking)
                 try {
                         const memory = await getPersistentMemory()
                         memory.onNewSessionCreated(session.id)
                                 .then(result => {
                                         if (result.summarizedSessionId) {
-                                                console.log(`🧠 Phase 4: Processing previous session ${result.summarizedSessionId}`)
+                                                console.log(`🧠 Persistent Memory: Processing previous session ${result.summarizedSessionId}`)
                                         }
                                 })
-                                .catch(err => console.error('Phase 4 processing error:', err.message))
+                                .catch(err => console.error('Persistent Memory processing error:', err.message))
                 } catch (memErr) {
                         console.error('Failed to init persistent memory:', memErr.message)
                 }

@@ -36,7 +36,7 @@ export const memoryAPI = {
   delete: (id)           => api.delete(`/memory/${id}`)
 }
 
-// Phase 4: Persistent Memory API
+// Persistent Memory API
 export const profileAPI = {
   // User profile endpoints
   get: () => api.get('/profile'),
@@ -47,6 +47,14 @@ export const profileAPI = {
   getSummaries: () => api.get('/profile/summaries'),
   getSummary: (sessionId) => api.get(`/profile/summaries/${sessionId}`),
   generateSummary: (sessionId) => api.post(`/profile/summaries/${sessionId}`)
+}
+
+//  Relay API
+export const relayAPI = {
+  followUp: (data) => api.post('/ai/relay-followup', data),
+  smart: (data) => api.post('/ai/relay-smart', data),
+  getTopics: (sessionId) => api.post('/ai/relay-topics', { sessionId }),
+  getTopicsManual: (sessionId, description) => api.post('/ai/relay-topics-manual', { sessionId, description }),
 }
 
 export default api

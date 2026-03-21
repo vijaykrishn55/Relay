@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, User, Copy, Check, RefreshCw, Pencil, X } from "lucide-react";
+import { Bot, User, Copy, Check, RefreshCw, Pencil, X, CornerDownRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { formatRelativeTime } from "../utils/formatTime";
 import remarkGfm from 'remark-gfm'
@@ -189,7 +189,7 @@ function MessageBubble({
       <div
         className={`relative flex items-start gap-2 w-full ${
           selectionMode ? 'cursor-pointer' : ''
-        } ${selected ? 'ring-2 ring-blue-400 rounded-xl p-1' : ''}`}
+        } ${selectionMode && selected ? 'ring-2 ring-blue-400 rounded-xl p-1' : ''}`}
         onClick={handleSelectionClick}
       >
         {selectionMode && (
@@ -247,6 +247,12 @@ function MessageBubble({
               )}
               {message.timestamp && (
                 <span className="text-[10px] text-gray-400">{formatRelativeTime(message.timestamp)}</span>
+              )}
+              {message.relayUpdated && (
+                <span className="text-[10px] text-indigo-500 flex items-center gap-0.5">
+                  <CornerDownRight size={8} />
+                  Refined via Relay
+                </span>
               )}
             </div>
           </div>
