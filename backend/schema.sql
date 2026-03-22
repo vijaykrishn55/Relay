@@ -184,3 +184,24 @@ SET @sql = IF(@col_exists = 0, 'ALTER TABLE messages ADD COLUMN relay_followups 
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 12. SESSION LINEAGE — Phase 5: Track parent-child session relationships
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sessions' AND column_name = 'parent_session_id');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE sessions ADD COLUMN parent_session_id VARCHAR(36) DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sessions' AND column_name = 'relay_topic');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE sessions ADD COLUMN relay_topic VARCHAR(255) DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sessions' AND index_name = 'idx_sessions_parent');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_sessions_parent ON sessions(parent_session_id)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

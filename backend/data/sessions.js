@@ -32,6 +32,8 @@ async function getSession(id) {
     id: session.id,
     title: session.title,
     context_messages: contextMessages,
+    parent_session_id: session.parent_session_id || null,
+    relay_topic: session.relay_topic || null,
     createdAt: session.created_at,
     updatedAt: session.updated_at,
     messages
@@ -40,7 +42,7 @@ async function getSession(id) {
 
 async function getAllSessions() {
   const rows = await query(
-    `SELECT s.id, s.title, s.created_at, s.updated_at,
+    `SELECT s.id, s.title, s.created_at, s.updated_at, s.parent_session_id, s.relay_topic,
             (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS messageCount
      FROM sessions s
      ORDER BY s.updated_at DESC`
@@ -50,7 +52,9 @@ async function getAllSessions() {
     title: r.title,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-    messageCount: r.messageCount
+    messageCount: r.messageCount,
+    parentSessionId: r.parent_session_id || null,
+    relayTopic: r.relay_topic || null
   }))
 }
 
@@ -89,21 +93,37 @@ async function addMessage(sessionId, message) {
   return getSession(sessionId)
 }
 
-async function createSessionWithContext(contextMessages) {
+async function createSessionWithContext(contextMessages, parentSessionId = null, relayTopic = null) {
   const id = uuidv4()
 
   await query(
-    `INSERT INTO sessions (id, title, context_messages, created_at, updated_at)
-     VALUES (?, 'New Chat', ?, NOW(), NOW())`,
-    [id, JSON.stringify(contextMessages)]
+    `INSERT INTO sessions (id, title, context_messages, parent_session_id, relay_topic, created_at, updated_at)
+     VALUES (?, 'New Chat', ?, ?, ?, NOW(), NOW())`,
+    [id, JSON.stringify(contextMessages), parentSessionId, relayTopic]
   )
+
+  // Update parent session's updated_at so it stays relevant in the sidebar
+  if (parentSessionId) {
+    await query(
+      'UPDATE sessions SET updated_at = NOW() WHERE id = ?',
+      [parentSessionId]
+    )
+  }
 
   return {
     id,
     title: 'New Chat',
     context_messages: contextMessages,
+    parent_session_id: parentSessionId,
+    relay_topic: relayTopic,
     messages: [],
     createdAt: new Date().toISOString()
   }
 }
-module.exports = { createSession,createSessionWithContext, getSession, getAllSessions, updateSession, deleteSession, addMessage }
+
+// Update session's updated_at timestamp (called when session is accessed/used)
+async function touchSession(id) {
+  await query('UPDATE sessions SET updated_at = NOW() WHERE id = ?', [id])
+  return true
+}
+module.exports = { createSession, createSessionWithContext, getSession, getAllSessions, updateSession, deleteSession, addMessage, touchSession }

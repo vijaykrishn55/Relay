@@ -7,7 +7,8 @@ const{
         getAllSessions,
         updateSession,
         deleteSession,
-        addMessage
+        addMessage,
+        touchSession
 }= require('../data/sessions')
 const { loadModels } = require('../data/models')
 const GroqProvider = require('../services/groqProvider')
@@ -40,11 +41,11 @@ router.get('/', async (req, res) => {
 // POST /api/sessions/with-context — create a session pre-loaded with context messages
 router.post('/with-context', async (req, res) => {
   try {
-    const { contextMessages } = req.body
+    const { contextMessages, parentSessionId, topic } = req.body
     if (!contextMessages || !Array.isArray(contextMessages) || contextMessages.length === 0) {
       return res.status(400).json({ error: 'contextMessages array is required' })
     }
-    const session = await createSessionWithContext(contextMessages)
+    const session = await createSessionWithContext(contextMessages, parentSessionId || null, topic || null)
     res.status(201).json(session)
   } catch (err) {
     console.error('Failed to create context session:', err)
@@ -125,6 +126,17 @@ router.post('/:id/messages', async (req, res) => {
                 const session = await addMessage(req.params.id, {role,content,model:model || null})
                 if(!session) return res.status(404).json({error: 'Session not found'})
                 res.json(session)
+        } catch (error) {
+                res.status(500).json({ error: error.message })
+        }
+})
+
+// POST /api/sessions/:id/touch - update session's updated_at timestamp
+// Used when user switches to/accesses a session to keep it relevant in sidebar
+router.post('/:id/touch', async (req, res) => {
+        try {
+                await touchSession(req.params.id)
+                res.json({ success: true })
         } catch (error) {
                 res.status(500).json({ error: error.message })
         }

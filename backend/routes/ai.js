@@ -507,11 +507,11 @@ router.post('/relay-smart', async (req, res) => {
         model: null
       }]
 
-      // Create the new session with context
+      // Create the new session with context, tracking parent session and topic
       const { createSessionWithContext } = require('../data/sessions')
-      const newSession = await createSessionWithContext(contextMsgs)
+      const newSession = await createSessionWithContext(contextMsgs, sessionId, classification.topic)
 
-      console.log(`🌿 Relay branched new session ${newSession.id} for topic: "${classification.topic}"`)
+      console.log(`🌿 Relay branched new session ${newSession.id} for topic: "${classification.topic}" (parent: ${sessionId})`)
 
       return res.json({
         success: true,
@@ -520,7 +520,9 @@ router.post('/relay-smart', async (req, res) => {
         newSession: {
           id: newSession.id,
           title: newSession.title,
-          context_messages: newSession.context_messages
+          context_messages: newSession.context_messages,
+          parent_session_id: newSession.parent_session_id,
+          relay_topic: newSession.relay_topic
         },
         messageCount: contextMsgs.length
       })

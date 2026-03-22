@@ -24,6 +24,7 @@ function Chat() {
   // Context-seeded session state
   const [contextCollapsed, setContextCollapsed] = useState(false)
   const [contextMessages, setContextMessages] = useState([])
+  const [parentSessionInfo, setParentSessionInfo] = useState(null) // { id, topic }
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false)
@@ -63,14 +64,24 @@ function Chat() {
   useEffect(() => {
     if (!activeSessionId) {
       setContextMessages([])
+      setParentSessionInfo(null)
       return
     }
     loadSession(activeSessionId)
-    // Also load context_messages for this session
+    // Also load context_messages and parent info for this session
     sessionsAPI.getById(activeSessionId).then(res => {
       setContextMessages(res.data.context_messages || [])
+      if (res.data.parent_session_id) {
+        setParentSessionInfo({
+          id: res.data.parent_session_id,
+          topic: res.data.relay_topic || null
+        })
+      } else {
+        setParentSessionInfo(null)
+      }
     }).catch(() => {
       setContextMessages([])
+      setParentSessionInfo(null)
     })
   }, [activeSessionId, loadSession])
 
@@ -277,7 +288,8 @@ function Chat() {
       }))
 
     try {
-      const res = await sessionsAPI.createWithContext(ctxMessages)
+      // Pass current session as parent
+      const res = await sessionsAPI.createWithContext(ctxMessages, activeSessionId, null)
       const newSession = res.data
 
       // Skip the auto-load in ChatContext so it doesn't overwrite our state
@@ -286,6 +298,10 @@ function Chat() {
       setMessages([])
       // Set context messages immediately — we already have them
       setContextMessages(newSession.context_messages || ctxMessages)
+      setParentSessionInfo(newSession.parent_session_id ? {
+        id: newSession.parent_session_id,
+        topic: newSession.relay_topic || null
+      } : null)
       setSelectionMode(false)
       setSelectedIndices(new Set())
       fetchSessions()
@@ -404,6 +420,10 @@ function Chat() {
         setActiveSessionId(newSession.id)
         setMessages([])
         setContextMessages(newSession.context_messages || [])
+        setParentSessionInfo(newSession.parent_session_id ? {
+          id: newSession.parent_session_id,
+          topic: newSession.relay_topic || response.data.topic || null
+        } : null)
         fetchSessions()
       }
 
@@ -436,13 +456,18 @@ function Chat() {
     }
 
     try {
-      const res = await sessionsAPI.createWithContext(contextMsgs)
+      // Pass current session as parent and topic name
+      const res = await sessionsAPI.createWithContext(contextMsgs, activeSessionId, topic.name)
       const newSession = res.data
 
       skipLoadRef.current = true
       setActiveSessionId(newSession.id)
       setMessages([])
       setContextMessages(newSession.context_messages || contextMsgs)
+      setParentSessionInfo(newSession.parent_session_id ? {
+        id: newSession.parent_session_id,
+        topic: newSession.relay_topic || topic.name
+      } : null)
       setRelayTarget(null)
       setRelayTopics([])
       setRelayTopicsExpanded(false)
@@ -500,7 +525,9 @@ function Chat() {
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-purple-700 hover:bg-purple-100/50 transition-colors"
               >
                 <Layers size={14} />
-                Context from previous session ({contextMessages.length} messages)
+                {parentSessionInfo?.topic
+                  ? `Context: "${parentSessionInfo.topic}" from previous session`
+                  : `Context from previous session (${contextMessages.length} messages)`}
                 {contextCollapsed ? <ChevronRight size={14} className="ml-auto" /> : <ChevronDown size={14} className="ml-auto" />}
               </button>
 

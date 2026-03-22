@@ -4,6 +4,7 @@ const {
   createSessionSummary,
   hasSessionSummary,
   getLastSessionSummary,
+  getParentOrLastSessionSummary,
   buildSummaryContext
 } = require('../data/sessionSummary')
 
@@ -168,6 +169,7 @@ Guidelines:
   /**
    * Build the full persistent context for a new conversation.
    * Combines: User Profile + Last Session Summary
+   * For relay sessions, prefers parent session's summary over most recent
    *
    * @param {string} currentSessionId - The current session (to exclude from last session lookup)
    * @returns {string} Combined context string for the AI system prompt
@@ -183,8 +185,8 @@ Guidelines:
         parts.push(profileContext)
       }
 
-      // 2. Load Last Session Summary (if exists)
-      const lastSummary = await getLastSessionSummary(currentSessionId)
+      // 2. Load Last Session Summary (prefers parent session for relay sessions)
+      const lastSummary = await getParentOrLastSessionSummary(currentSessionId)
       const summaryContext = buildSummaryContext(lastSummary)
       if (summaryContext) {
         parts.push(summaryContext)

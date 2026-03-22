@@ -37,6 +37,8 @@ export function ChatProvider({ children }) {
     setMessages([])
     setError('')
     navigate('/chat')
+    // Touch session to update its timestamp (non-blocking)
+    sessionsAPI.touch(id).catch(() => {})
   }, [navigate])
 
   const handleDeleteSession = useCallback(async (id) => {

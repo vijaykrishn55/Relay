@@ -101,6 +101,36 @@ async function getLastSessionSummary(excludeSessionId = null) {
 }
 
 /**
+ * Get the parent session's summary (for relay-created sessions)
+ * Falls back to last session summary if parent has no summary
+ */
+async function getParentOrLastSessionSummary(currentSessionId) {
+  if (!currentSessionId) return getLastSessionSummary()
+
+  // First check if current session has a parent
+  const sessionRows = await query(
+    'SELECT parent_session_id FROM sessions WHERE id = ?',
+    [currentSessionId]
+  )
+
+  if (sessionRows.length > 0 && sessionRows[0].parent_session_id) {
+    const parentId = sessionRows[0].parent_session_id
+
+    // Try to get the parent session's summary
+    const parentSummary = await getSessionSummary(parentId)
+    if (parentSummary) {
+      // Enrich with session title
+      const titleRows = await query('SELECT title FROM sessions WHERE id = ?', [parentId])
+      parentSummary.session_title = titleRows.length > 0 ? titleRows[0].title : 'Previous Chat'
+      return parentSummary
+    }
+  }
+
+  // Fallback to most recent summary
+  return getLastSessionSummary(currentSessionId)
+}
+
+/**
  * Get all session summaries (for admin/debugging)
  */
 async function getAllSessionSummaries() {
@@ -164,6 +194,7 @@ module.exports = {
   getSessionSummary,
   hasSessionSummary,
   getLastSessionSummary,
+  getParentOrLastSessionSummary,
   getAllSessionSummaries,
   deleteSessionSummary,
   buildSummaryContext
