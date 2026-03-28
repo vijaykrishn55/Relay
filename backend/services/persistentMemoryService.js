@@ -1,5 +1,5 @@
 const { query } = require('../data/db')
-const { getUserProfile, mergeIntoProfile, buildProfileContext } = require('../data/userProfile')
+const { getUserProfile, mergeIntoProfile, updateUserProfile, buildProfileContext } = require('../data/userProfile')
 const {
   createSessionSummary,
   hasSessionSummary,
@@ -10,11 +10,13 @@ const {
 
 /**
  * PersistentMemoryService
+ * Enhanced in Phase 7: Conversational Intelligence
  *
  * This service handles:
  * 1. Session Summarization - When a session ends, summarize it comprehensively
  * 2. User Profile Extraction - Extract user info from session and merge into profile
  * 3. Context Building - Combine profile + last session summary for new chats
+ * 4. Phase 7 Extraction - communication_style, expertise_levels, engagement_preferences
  */
 class PersistentMemoryService {
   constructor(aiProvider, summarizerModel) {
@@ -24,6 +26,7 @@ class PersistentMemoryService {
 
   /**
    * Summarize a completed session and extract user information.
+   * Enhanced with Phase 7 fields: communication_style, expertise_levels.
    * Called when a new session is created (to summarize the previous one).
    *
    * @param {string} sessionId - The session ID to summarize
@@ -54,7 +57,7 @@ class PersistentMemoryService {
         .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
         .join('\n\n')
 
-      // Create the summarization prompt
+      // Enhanced summarization prompt with Phase 7 fields
       const summarizationPrompt = `Analyze this conversation and create a structured summary. Return ONLY valid JSON, no markdown.
 
 CONVERSATION:
@@ -69,7 +72,11 @@ Return this exact JSON structure:
     "name": "<user's name if explicitly stated, or null>",
     "preferences": ["<communication preference>"],
     "interests": ["<topic they're interested in>"],
-    "personal_facts": ["<fact about the user they mentioned>"]
+    "personal_facts": ["<fact about the user they mentioned>"],
+    "communication_style": "<formal|casual|friendly|technical|educational or null if unclear>",
+    "expertise_levels": {
+      "<topic>": "<beginner|intermediate|advanced>"
+    }
   }
 }
 
@@ -77,9 +84,20 @@ Guidelines:
 - summary: Capture the essence of the entire conversation
 - topics: List 2-5 main subjects discussed
 - outcomes: List any decisions made, solutions found, or conclusions reached
-- user_info: ONLY include information the user explicitly stated about themselves
-- For user_info arrays, use empty arrays [] if nothing was mentioned
-- Do not infer or assume - only include what was directly stated`
+- user_info: ONLY include information explicitly stated or clearly evident
+- communication_style: Infer from how the user writes:
+  - formal: professional phrasing, complete sentences, no slang
+  - casual: relaxed tone, contractions, informal
+  - friendly: warm language, uses exclamations, personable
+  - technical: uses jargon, code-focused, direct
+  - educational: asks learning questions, wants explanations
+- expertise_levels: Infer from question complexity and terminology used
+  - beginner: asks basic questions, needs concepts explained
+  - intermediate: understands concepts, asks about implementation
+  - advanced: uses technical jargon, asks nuanced questions
+- For arrays, use empty arrays [] if nothing was mentioned
+- Do not infer name - only include if explicitly stated
+- For expertise_levels, only include topics actually discussed`
 
       console.log(`🔄 Generating summary for session ${sessionId}...`)
 
@@ -120,8 +138,8 @@ Guidelines:
       // Merge extracted user info into profile (non-blocking)
       if (parsed.user_info && Object.keys(parsed.user_info).length > 0) {
         try {
-          await mergeIntoProfile(parsed.user_info)
-          console.log(`👤 Updated user profile with extracted info`)
+          await this._mergeEnhancedUserInfo(parsed.user_info)
+          console.log(`👤 Updated user profile with extracted info (Phase 7 enhanced)`)
         } catch (profileError) {
           console.error(`⚠️ Failed to merge user info:`, profileError.message)
         }
@@ -132,6 +150,55 @@ Guidelines:
     } catch (error) {
       console.error(`❌ Error summarizing session ${sessionId}:`, error.message)
       return null
+    }
+  }
+
+  /**
+   * Enhanced merge function for Phase 7 fields.
+   * Handles communication_style and expertise_levels separately.
+   * @private
+   */
+  async _mergeEnhancedUserInfo(extractedInfo) {
+    // Standard merge for basic fields
+    const basicInfo = {
+      name: extractedInfo.name,
+      preferences: extractedInfo.preferences,
+      interests: extractedInfo.interests,
+      personal_facts: extractedInfo.personal_facts
+    }
+    await mergeIntoProfile(basicInfo)
+
+    // Phase 7: Update communication_style if detected
+    if (extractedInfo.communication_style) {
+      const validStyles = ['formal', 'casual', 'friendly', 'technical', 'educational']
+      if (validStyles.includes(extractedInfo.communication_style)) {
+        await updateUserProfile({ communication_style: extractedInfo.communication_style })
+        console.log(`   → Communication style updated: ${extractedInfo.communication_style}`)
+      }
+    }
+
+    // Phase 7: Merge expertise_levels
+    if (extractedInfo.expertise_levels && typeof extractedInfo.expertise_levels === 'object') {
+      const currentProfile = await getUserProfile()
+      const currentLevels = currentProfile.expertise_levels || {}
+      const newLevels = extractedInfo.expertise_levels
+
+      // Merge: keep higher expertise level if conflict
+      const levelOrder = ['beginner', 'intermediate', 'advanced']
+      const mergedLevels = { ...currentLevels }
+
+      for (const [topic, level] of Object.entries(newLevels)) {
+        if (!levelOrder.includes(level)) continue
+        const currentLevel = mergedLevels[topic]
+        if (!currentLevel || levelOrder.indexOf(level) > levelOrder.indexOf(currentLevel)) {
+          mergedLevels[topic] = level
+        }
+      }
+
+      if (Object.keys(mergedLevels).length > 0) {
+        await updateUserProfile({ expertise_levels: mergedLevels })
+        console.log(`   → Expertise levels updated: ${JSON.stringify(mergedLevels)}`)
+      }
     }
   }
 

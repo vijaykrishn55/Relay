@@ -11,11 +11,15 @@ class CerebrasProvider {
     try {
       const startTime = Date.now()
 
-      // Map our model names to Cerebras model IDs
+      // Map our model names to valid Cerebras model IDs
+      // Valid Cerebras models: llama3.1-8b, llama-3.3-70b, qwen-3-32b
       const modelMap = {
-        'Z.AI GLM 4.7': 'zai-glm-4.7',
-        'OpenAI GPT OSS': 'gpt-oss-120b',
-        'Llama 3.1 8B': 'llama3.1-8b'
+        'Qwen 3 32B': 'qwen-3-32b',
+        'Llama 3.3 70B': 'llama-3.3-70b',
+        'Llama 3.1 8B': 'llama3.1-8b',
+        // Legacy names (for backward compatibility with DB)
+        'Z.AI GLM 4.7': 'qwen-3-32b',
+        'OpenAI GPT OSS': 'llama-3.3-70b'
       }
 
       const cerebrasModel = modelMap[model.name] || 'llama3.1-8b'
@@ -37,11 +41,17 @@ class CerebrasProvider {
       const endTime = Date.now()
       const latency = endTime - startTime
 
-      const output = completion.choices[0].message.content
-      const tokensUsed = completion.usage.total_tokens
+      const output = completion.choices?.[0]?.message?.content || ''
+      const tokensUsed = completion.usage?.total_tokens || 0
       const cost = this.calculateCost(tokensUsed, model.costPer1k)
 
-      console.log(`✅ Success with Cerebras ${cerebrasModel}`)
+      // Validate output is not empty
+      if (!output || output.trim() === '') {
+        console.error(`⚠️ Cerebras ${cerebrasModel} returned empty content`)
+        throw new Error('Cerebras returned empty response content')
+      }
+
+      console.log(`✅ Success with Cerebras ${cerebrasModel} (${output.length} chars)`)
 
       return {
         output,

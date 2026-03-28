@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS models (
     max_output_tokens INT          NOT NULL DEFAULT 0,
     endpoint          VARCHAR(255) NOT NULL,
     model_id          VARCHAR(100) NOT NULL,
-    api_provider      VARCHAR(50)  NOT NULL
+    api_provider      VARCHAR(50)  NOT NULL,
+    scores            JSON         DEFAULT NULL,          -- {"reasoning":0.8,"code":0.95,...}
+    roles             JSON         DEFAULT NULL           -- ["specialist","assembler"]
 );
 
 -- ============================================================
@@ -121,16 +123,16 @@ DEALLOCATE PREPARE stmt;
 -- ============================================================
 INSERT IGNORE INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider) VALUES
 (2,  'Codestral',              'Mistral',  'active', '["text-generation","code","reasoning","documentation"]',     0, 250, '{"rpm":60,"tpm":100000}',                       128000, 128000, 'https://codestral.mistral.ai', 'codestral-latest',                              'mistral'),
-(3,  'Z.AI GLM 4.7',          'Cerebras', 'active', '["text-generation","code","reasoning"]',                     0, 180, '{"rpm":10,"tpm":60000,"rpd":100}',              128000, 128000, 'https://api.cerebras.ai',      'zai-glm-4.7',                                  'cerebras'),
-(4,  'OpenAI GPT OSS',        'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":64000,"rpd":14400}',            128000,  65536, 'https://api.cerebras.ai',      'gpt-oss-120b',                                  'cerebras'),
-(5,  'Llama 3.1 8B',          'Cerebras', 'active', '["text-generation","code"]',                                 0, 150, '{"rpm":30,"tpm":60000,"rpd":14400}',            128000, 128000, 'https://api.cerebras.ai',      'llama3.1-8b',                                   'cerebras'),
-(6,  'Allam 2 7B',            'Groq',     'active', '["text-generation","multilingual"]',                         0, 150, '{"rpm":30,"rpd":7000,"tpm":6000,"tpd":500000}', 4096,   4096,  'https://api.groq.com',         'allam-2-7b',                                    'groq'),
-(7,  'Llama 3.1 8B Instant',  'Groq',     'active', '["text-generation","code"]',                                 0, 120, '{"rpm":30,"rpd":14400,"tpm":6000,"tpd":500000}',131072, 131072, 'https://api.groq.com',         'llama-3.1-8b-instant',                          'groq'),
-(8,  'Llama 4 Scout 17B',     'Groq',     'active', '["text-generation","reasoning","analysis"]',                 0, 160, '{"rpm":30,"rpd":1000,"tpm":30000,"tpd":500000}',131072,  8192,  'https://api.groq.com',         'meta-llama/llama-4-scout-17b-16e-instruct',     'groq'),
-(9,  'Compound Mini',         'Groq',     'active', '["text-generation"]',                                        0, 100, '{"rpm":30,"rpd":250,"tpm":70000}',              131072,  8192,  'https://api.groq.com',         'groq/compound-mini',                            'groq'),
-(10, 'Compound',              'Groq',     'active', '["text-generation","reasoning"]',                            0, 140, '{"rpm":30,"rpd":250,"tpm":70000}',              131072,  8192,  'https://api.groq.com',         'groq/compound',                                 'groq'),
-(11, 'Command A Reasoning',   'Cohere',   'active', '["text-generation","reasoning","analysis"]',                 0, 300, '{"rpm":20,"tpm":40000}',                        256000, 32000,  'https://api.cohere.ai',        'command-a-reasoning-08-2025',                   'cohere'),
-(12, 'Command R Plus',        'Cohere',   'active', '["text-generation","reasoning","multilingual"]',             0, 280, '{"rpm":20,"tpm":40000}',                        128000,  4000,  'https://api.cohere.ai',        'command-r-plus-08-2024',                        'cohere');
+(3,  'Qwen 3 32B',             'Cerebras', 'active', '["text-generation","code","reasoning"]',                     0, 180, '{"rpm":10,"tpm":60000,"rpd":100}',              128000, 128000, 'https://api.cerebras.ai',      'qwen-3-32b',                                    'cerebras'),
+(4,  'Llama 3.3 70B',          'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":64000,"rpd":14400}',            128000,  65536, 'https://api.cerebras.ai',      'llama-3.3-70b',                                 'cerebras'),
+(5,  'Llama 3.1 8B',           'Cerebras', 'active', '["text-generation","code"]',                                 0, 150, '{"rpm":30,"tpm":60000,"rpd":14400}',            128000, 128000, 'https://api.cerebras.ai',      'llama3.1-8b',                                   'cerebras'),
+(6,  'Allam 2 7B',             'Groq',     'active', '["text-generation","multilingual"]',                         0, 150, '{"rpm":30,"rpd":7000,"tpm":6000,"tpd":500000}', 4096,   4096,  'https://api.groq.com',         'allam-2-7b',                                    'groq'),
+(7,  'Llama 3.1 8B Instant',   'Groq',     'active', '["text-generation","code"]',                                 0, 120, '{"rpm":30,"rpd":14400,"tpm":6000,"tpd":500000}',131072, 131072, 'https://api.groq.com',         'llama-3.1-8b-instant',                          'groq'),
+(8,  'Llama 4 Scout 17B',      'Groq',     'active', '["text-generation","reasoning","analysis"]',                 0, 160, '{"rpm":30,"rpd":1000,"tpm":30000,"tpd":500000}',131072,  8192,  'https://api.groq.com',         'meta-llama/llama-4-scout-17b-16e-instruct',     'groq'),
+(9,  'Compound Mini',          'Groq',     'active', '["text-generation"]',                                        0, 100, '{"rpm":30,"rpd":250,"tpm":70000}',              131072,  8192,  'https://api.groq.com',         'groq/compound-mini',                            'groq'),
+(10, 'Compound',               'Groq',     'active', '["text-generation","reasoning"]',                            0, 140, '{"rpm":30,"rpd":250,"tpm":70000}',              131072,  8192,  'https://api.groq.com',         'groq/compound',                                 'groq'),
+(11, 'Command A Reasoning',    'Cohere',   'active', '["text-generation","reasoning","analysis"]',                 0, 300, '{"rpm":20,"tpm":40000}',                        256000, 32000,  'https://api.cohere.ai',        'command-a-reasoning-08-2025',                   'cohere'),
+(12, 'Command R Plus',         'Cohere',   'active', '["text-generation","reasoning","multilingual"]',             0, 280, '{"rpm":20,"tpm":40000}',                        128000,  4000,  'https://api.cohere.ai',        'command-r-plus-08-2024',                        'cohere');
 
 -- ============================================================
 -- 9. USER_PROFILES — Phase 4: Accumulated user understanding
@@ -148,6 +150,33 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 -- Insert default empty profile (single user assumption)
 INSERT IGNORE INTO user_profiles (id) VALUES (1);
+
+-- ============================================================
+-- 9.5 USER_PROFILES — Phase 7: Conversational Intelligence
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user_profiles' AND column_name = 'communication_style');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE user_profiles ADD COLUMN communication_style ENUM("formal","casual","friendly","technical","educational") DEFAULT "friendly"', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user_profiles' AND column_name = 'sentiment_trend');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE user_profiles ADD COLUMN sentiment_trend JSON DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user_profiles' AND column_name = 'expertise_levels');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE user_profiles ADD COLUMN expertise_levels JSON DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user_profiles' AND column_name = 'engagement_preferences');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE user_profiles ADD COLUMN engagement_preferences JSON DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================
 -- 10. SESSION_SUMMARIES — Phase 4: Comprehensive session snapshots
@@ -202,6 +231,33 @@ DEALLOCATE PREPARE stmt;
 
 SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sessions' AND index_name = 'idx_sessions_parent');
 SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_sessions_parent ON sessions(parent_session_id)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 12. ORCHESTRATION_LOGS — Hive Mind pipeline audit trail
+-- ============================================================
+CREATE TABLE IF NOT EXISTS orchestration_logs (
+    id                INT          AUTO_INCREMENT PRIMARY KEY,
+    session_id        VARCHAR(36)  NOT NULL,
+    user_question     TEXT         NOT NULL,
+    is_complex        BOOLEAN      NOT NULL DEFAULT FALSE,
+    triage_scores     JSON         DEFAULT NULL,           -- question need scores
+    decomposition     JSON         DEFAULT NULL,           -- subtask breakdown
+    strategies        JSON         DEFAULT NULL,           -- model assignments
+    execution_results JSON         DEFAULT NULL,           -- per-subtask results
+    models_used       JSON         DEFAULT NULL,           -- all model names used
+    total_latency     INT          DEFAULT NULL,           -- ms end-to-end
+    total_tokens      INT          DEFAULT NULL,
+    status            ENUM('success','partial','fallback','failed') DEFAULT 'success',
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'orchestration_logs' AND index_name = 'idx_orchestration_session');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_orchestration_session ON orchestration_logs(session_id, created_at)', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

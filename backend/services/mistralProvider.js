@@ -57,11 +57,17 @@ class MistralProvider {
       const endTime = Date.now();
       const latency = endTime - startTime;
 
-      const output = chatResponse.choices[0].message.content;
-      const tokensUsed = chatResponse.usage.total_tokens;
+      const output = chatResponse.choices?.[0]?.message?.content || '';
+      const tokensUsed = chatResponse.usage?.total_tokens || 0;
       const cost = this.calculateCost(tokensUsed, model.costPer1k);
 
-      console.log(`✅ Success with Mistral ${mistralModel}`);
+      // Validate output is not empty
+      if (!output || output.trim() === '') {
+        console.error(`⚠️ Mistral ${mistralModel} returned empty content`);
+        throw new Error('Mistral returned empty response content');
+      }
+
+      console.log(`✅ Success with Mistral ${mistralModel} (${output.length} chars)`);
 
       return {
         output,

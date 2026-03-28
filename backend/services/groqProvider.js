@@ -39,11 +39,17 @@ class GroqProvider {
       const endTime = Date.now()
       const latency = endTime - startTime
 
-      const output = completion.choices[0].message.content
-      const tokensUsed = completion.usage.total_tokens
+      const output = completion.choices?.[0]?.message?.content || ''
+      const tokensUsed = completion.usage?.total_tokens || 0
       const cost = this.calculateCost(tokensUsed, model.costPer1k)
 
-      console.log(`✅ Success with Groq ${groqModel}`)
+      // Validate output is not empty
+      if (!output || output.trim() === '') {
+        console.error(`⚠️ Groq ${groqModel} returned empty content`)
+        throw new Error('Groq returned empty response content')
+      }
+
+      console.log(`✅ Success with Groq ${groqModel} (${output.length} chars)`)
 
       return {
         output,

@@ -13,6 +13,7 @@ function parseJsonField(value) {
 
 /**
  * Get the user profile (single user assumption - id=1)
+ * Includes Phase 7 fields: communication_style, sentiment_trend, expertise_levels, engagement_preferences
  */
 async function getUserProfile() {
   const rows = await query('SELECT * FROM user_profiles WHERE id = 1')
@@ -26,6 +27,15 @@ async function getUserProfile() {
       interests: [],
       behavior_patterns: [],
       personal_facts: [],
+      // Phase 7 fields
+      communication_style: 'friendly',
+      sentiment_trend: [],
+      expertise_levels: {},
+      engagement_preferences: {
+        askClarifications: true,
+        detailLevel: 'comprehensive',
+        includeExamples: true
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
@@ -39,6 +49,15 @@ async function getUserProfile() {
     interests: parseJsonField(profile.interests) || [],
     behavior_patterns: parseJsonField(profile.behavior_patterns) || [],
     personal_facts: parseJsonField(profile.personal_facts) || [],
+    // Phase 7 fields
+    communication_style: profile.communication_style || 'friendly',
+    sentiment_trend: parseJsonField(profile.sentiment_trend) || [],
+    expertise_levels: parseJsonField(profile.expertise_levels) || {},
+    engagement_preferences: parseJsonField(profile.engagement_preferences) || {
+      askClarifications: true,
+      detailLevel: 'comprehensive',
+      includeExamples: true
+    },
     created_at: profile.created_at,
     updated_at: profile.updated_at
   }
@@ -46,6 +65,7 @@ async function getUserProfile() {
 
 /**
  * Update the user profile with new information
+ * Includes Phase 7 fields: communication_style, sentiment_trend, expertise_levels, engagement_preferences
  */
 async function updateUserProfile(updates) {
   const fields = []
@@ -70,6 +90,23 @@ async function updateUserProfile(updates) {
   if (updates.personal_facts !== undefined) {
     fields.push('personal_facts = ?')
     values.push(JSON.stringify(updates.personal_facts))
+  }
+  // Phase 7 fields
+  if (updates.communication_style !== undefined) {
+    fields.push('communication_style = ?')
+    values.push(updates.communication_style)
+  }
+  if (updates.sentiment_trend !== undefined) {
+    fields.push('sentiment_trend = ?')
+    values.push(JSON.stringify(updates.sentiment_trend))
+  }
+  if (updates.expertise_levels !== undefined) {
+    fields.push('expertise_levels = ?')
+    values.push(JSON.stringify(updates.expertise_levels))
+  }
+  if (updates.engagement_preferences !== undefined) {
+    fields.push('engagement_preferences = ?')
+    values.push(JSON.stringify(updates.engagement_preferences))
   }
 
   if (fields.length === 0) return getUserProfile()
@@ -152,6 +189,7 @@ async function mergeIntoProfile(extractedInfo) {
 
 /**
  * Build a human-readable summary of the user profile for AI context
+ * Includes Phase 7 fields for enhanced personalization
  */
 function buildProfileContext(profile) {
   if (!profile) return ''
@@ -178,6 +216,18 @@ function buildProfileContext(profile) {
     parts.push(`Behavior: ${profile.behavior_patterns.join('; ')}`)
   }
 
+  // Phase 7 additions
+  if (profile.communication_style && profile.communication_style !== 'friendly') {
+    parts.push(`Communication style: ${profile.communication_style}`)
+  }
+
+  if (profile.expertise_levels && Object.keys(profile.expertise_levels).length > 0) {
+    const expertiseStr = Object.entries(profile.expertise_levels)
+      .map(([topic, level]) => `${topic}: ${level}`)
+      .join(', ')
+    parts.push(`Expertise levels: ${expertiseStr}`)
+  }
+
   if (parts.length === 0) {
     return ''
   }
@@ -187,6 +237,7 @@ function buildProfileContext(profile) {
 
 /**
  * Clear the user profile (reset to empty)
+ * Resets all fields including Phase 7 additions
  */
 async function clearUserProfile() {
   await query(
@@ -195,7 +246,11 @@ async function clearUserProfile() {
       preferences = NULL,
       interests = NULL,
       behavior_patterns = NULL,
-      personal_facts = NULL
+      personal_facts = NULL,
+      communication_style = 'friendly',
+      sentiment_trend = NULL,
+      expertise_levels = NULL,
+      engagement_preferences = NULL
     WHERE id = 1`
   )
   return getUserProfile()

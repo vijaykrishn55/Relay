@@ -5,6 +5,22 @@ import { useChat } from '../context/ChatContext'
 import MessageBubble from "../components/MessageBubble";
 import RelayChip from "../components/RelayChip";
 
+// Clean up any mermaid error elements that may have been orphaned
+function cleanupMermaidErrors() {
+  document.querySelectorAll('[id^="dmermaid-"]').forEach(el => el.remove())
+  document.querySelectorAll('.mermaid-error').forEach(el => el.remove())
+  // Also remove any text nodes that are mermaid errors
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  const nodesToRemove = []
+  while (walker.nextNode()) {
+    if (walker.currentNode.textContent?.includes('Syntax error in text') ||
+        walker.currentNode.textContent?.includes('mermaid version')) {
+      nodesToRemove.push(walker.currentNode)
+    }
+  }
+  nodesToRemove.forEach(node => node.parentNode?.removeChild(node))
+}
+
 function Chat() {
   const {
     input, setInput,
@@ -20,6 +36,14 @@ function Chat() {
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId
   }, [activeSessionId])
+
+  // Cleanup mermaid errors on mount and when messages change
+  useEffect(() => {
+    cleanupMermaidErrors()
+    // Also set up a periodic cleanup
+    const interval = setInterval(cleanupMermaidErrors, 1000)
+    return () => clearInterval(interval)
+  }, [messages])
 
   // Context-seeded session state
   const [contextCollapsed, setContextCollapsed] = useState(false)

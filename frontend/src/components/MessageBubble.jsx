@@ -4,6 +4,104 @@ import ReactMarkdown from "react-markdown";
 import { formatRelativeTime } from "../utils/formatTime";
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import mermaid from 'mermaid'
+
+// Initialize mermaid once - completely disable auto-rendering and error output
+let mermaidInitialized = false
+function initMermaid() {
+  if (mermaidInitialized) return
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    securityLevel: 'loose',
+    logLevel: 'fatal', // Only fatal errors
+    suppressErrors: true,
+  })
+  mermaidInitialized = true
+}
+
+// Custom component to render Mermaid diagrams safely
+function MermaidDiagram({ code }) {
+  const [svg, setSvg] = useState('')
+  const [error, setError] = useState(null)
+  const [showCode, setShowCode] = useState(false)
+
+  useEffect(() => {
+    if (!code) return
+
+    const renderDiagram = async () => {
+      try {
+        initMermaid()
+
+        // Create a unique ID for this render
+        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
+
+        // Create an off-screen container for rendering
+        const container = document.createElement('div')
+        container.id = id
+        container.style.display = 'none'
+        document.body.appendChild(container)
+
+        try {
+          const { svg: renderedSvg } = await mermaid.render(id, code.trim())
+          setSvg(renderedSvg)
+          setError(null)
+        } finally {
+          // Always clean up - remove the container and any error elements
+          container.remove()
+          // Also remove any mermaid error elements that might have been created
+          document.querySelectorAll(`[id^="d${id}"]`).forEach(el => el.remove())
+          document.querySelectorAll('.mermaid-error').forEach(el => el.remove())
+        }
+      } catch (err) {
+        // Silently set error state - don't log
+        setError('invalid')
+        setSvg('')
+      }
+    }
+
+    renderDiagram()
+  }, [code])
+
+  // On error, show the code as a styled code block
+  if (error) {
+    return (
+      <div className="my-4 relative">
+        <div className="flex items-center justify-between bg-gray-800 text-gray-300 px-3 py-1.5 rounded-t-lg text-xs">
+          <span>mermaid (diagram code)</span>
+          <button
+            onClick={() => setShowCode(!showCode)}
+            className="hover:text-white"
+          >
+            {showCode ? 'Hide' : 'Show'} code
+          </button>
+        </div>
+        {showCode ? (
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-b-lg text-xs overflow-auto max-h-64">
+            <code>{code}</code>
+          </pre>
+        ) : (
+          <div className="bg-gray-100 border border-gray-200 rounded-b-lg p-4 text-center text-gray-500 text-sm">
+            <span className="text-lg">📊</span>
+            <p className="mt-1">Diagram preview unavailable</p>
+            <p className="text-xs text-gray-400">Click "Show code" to view the mermaid source</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return svg ? (
+    <div
+      className="my-4 flex justify-center overflow-auto bg-white rounded-lg p-2 border border-gray-100"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  ) : (
+    <div className="animate-pulse bg-gray-100 h-32 rounded-lg flex items-center justify-center text-gray-400">
+      Loading diagram...
+    </div>
+  )
+}
 
 function CodeBlock({ children }) {
   const [copied, setCopied] = useState(false)
@@ -235,7 +333,27 @@ function MessageBubble({
                 prose-pre:my-2 prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg
                 prose-code:text-pink-600 prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
                 prose-pre:relative">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                  components={{
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || '')
+                      const language = match ? match[1] : ''
+
+                      // Render Mermaid diagrams
+                      if (language === 'mermaid' && !inline) {
+                        return <MermaidDiagram code={String(children).replace(/\n$/, '')} />
+                      }
+
+                      // Regular code block
+                      return (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      )
+                    }
+                  }}>
                   {message.content}
                 </ReactMarkdown>
               </div>

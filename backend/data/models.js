@@ -16,13 +16,15 @@ const staticModels = [
     maxOutputTokens: 128000,
     endpoint: 'https://codestral.mistral.ai',
     model_id: 'codestral-latest',
-    apiProvider: 'mistral'
+    apiProvider: 'mistral',
+    scores: { reasoning: 0.7, code: 0.95, creativity: 0.4, speed: 0.6, multilingual: 0.5, analysis: 0.6, instruction: 0.8, knowledge: 0.6 },
+    roles: ['specialist']
   },
   
   // Cerebras
   {
     id: 3,
-    name: 'Z.AI GLM 4.7',
+    name: 'Qwen 3 32B',
     provider: 'Cerebras',
     status: 'active',
     capabilities: ['text-generation', 'code', 'reasoning'],
@@ -33,12 +35,14 @@ const staticModels = [
     contextWindow: 128000,
     maxOutputTokens: 128000,
     endpoint: 'https://api.cerebras.ai',
-    model_id: 'zai-glm-4.7',
-    apiProvider: 'cerebras'
+    model_id: 'qwen-3-32b',
+    apiProvider: 'cerebras',
+    scores: { reasoning: 0.75, code: 0.85, creativity: 0.5, speed: 0.7, multilingual: 0.4, analysis: 0.7, instruction: 0.7, knowledge: 0.65 },
+    roles: ['specialist']
   },
   {
     id: 4,
-    name: 'OpenAI GPT OSS',
+    name: 'Llama 3.3 70B',
     provider: 'Cerebras',
     status: 'active',
     capabilities: ['text-generation', 'code', 'reasoning', 'analysis'],
@@ -48,8 +52,10 @@ const staticModels = [
     contextWindow: 128000,
     maxOutputTokens: 65536,
     endpoint: 'https://api.cerebras.ai',
-    model_id: 'gpt-oss-120b',
-    apiProvider: 'cerebras'
+    model_id: 'llama-3.3-70b',
+    apiProvider: 'cerebras',
+    scores: { reasoning: 0.8, code: 0.8, creativity: 0.65, speed: 0.65, multilingual: 0.6, analysis: 0.8, instruction: 0.75, knowledge: 0.8 },
+    roles: ['specialist', 'assembler']
   },
   {
     id: 5,
@@ -64,7 +70,9 @@ const staticModels = [
     maxOutputTokens: 128000,
     endpoint: 'https://api.cerebras.ai',
     model_id: 'llama3.1-8b',
-    apiProvider: 'cerebras'
+    apiProvider: 'cerebras',
+    scores: { reasoning: 0.5, code: 0.6, creativity: 0.5, speed: 0.9, multilingual: 0.3, analysis: 0.45, instruction: 0.6, knowledge: 0.5 },
+    roles: ['decomposer', 'strategist']
   },
   
   // Groq
@@ -81,7 +89,9 @@ const staticModels = [
     maxOutputTokens: 4096,
     endpoint: 'https://api.groq.com',
     model_id: 'allam-2-7b',
-    apiProvider: 'groq'
+    apiProvider: 'groq',
+    scores: { reasoning: 0.4, code: 0.2, creativity: 0.5, speed: 0.7, multilingual: 0.9, analysis: 0.3, instruction: 0.5, knowledge: 0.4 },
+    roles: ['specialist']
   },
   {
     id: 7,
@@ -96,7 +106,9 @@ const staticModels = [
     maxOutputTokens: 131072,
     endpoint: 'https://api.groq.com',
     model_id: 'llama-3.1-8b-instant',
-    apiProvider: 'groq'
+    apiProvider: 'groq',
+    scores: { reasoning: 0.45, code: 0.55, creativity: 0.45, speed: 0.95, multilingual: 0.3, analysis: 0.4, instruction: 0.6, knowledge: 0.45 },
+    roles: ['decomposer', 'strategist']
   },
   {
     id: 8,
@@ -111,7 +123,9 @@ const staticModels = [
     maxOutputTokens: 8192,
     endpoint: 'https://api.groq.com',
     model_id: 'meta-llama/llama-4-scout-17b-16e-instruct',
-    apiProvider: 'groq'
+    apiProvider: 'groq',
+    scores: { reasoning: 0.85, code: 0.6, creativity: 0.7, speed: 0.7, multilingual: 0.5, analysis: 0.8, instruction: 0.75, knowledge: 0.75 },
+    roles: ['specialist', 'assembler', 'strategist']
   },
   {
     id: 9,
@@ -126,7 +140,9 @@ const staticModels = [
     maxOutputTokens: 8192,
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound-mini',
-    apiProvider: 'groq'
+    apiProvider: 'groq',
+    scores: { reasoning: 0.4, code: 0.3, creativity: 0.3, speed: 0.9, multilingual: 0.2, analysis: 0.35, instruction: 0.8, knowledge: 0.5 },
+    roles: ['decomposer']
   },
   {
     id: 10,
@@ -141,7 +157,9 @@ const staticModels = [
     maxOutputTokens: 8192,
     endpoint: 'https://api.groq.com',
     model_id: 'groq/compound',
-    apiProvider: 'groq'
+    apiProvider: 'groq',
+    scores: { reasoning: 0.6, code: 0.4, creativity: 0.4, speed: 0.8, multilingual: 0.3, analysis: 0.55, instruction: 0.75, knowledge: 0.6 },
+    roles: ['decomposer', 'strategist']
   },
   
   // Cohere Models
@@ -158,7 +176,9 @@ const staticModels = [
     maxOutputTokens: 32000,
     endpoint: 'https://api.cohere.ai',
     model_id: 'command-a-reasoning-08-2025',
-    apiProvider: 'cohere'
+    apiProvider: 'cohere',
+    scores: { reasoning: 0.95, code: 0.65, creativity: 0.6, speed: 0.3, multilingual: 0.7, analysis: 0.9, instruction: 0.8, knowledge: 0.85 },
+    roles: ['specialist', 'assembler']
   },
   {
     id: 12,
@@ -173,7 +193,9 @@ const staticModels = [
     maxOutputTokens: 4000,
     endpoint: 'https://api.cohere.ai',
     model_id: 'command-r-plus-08-2024',
-    apiProvider: 'cohere'
+    apiProvider: 'cohere',
+    scores: { reasoning: 0.7, code: 0.45, creativity: 0.6, speed: 0.35, multilingual: 0.8, analysis: 0.65, instruction: 0.7, knowledge: 0.7 },
+    roles: ['specialist']
   }
 ]
 
@@ -198,7 +220,9 @@ async function loadModels() {
       maxOutputTokens: r.max_output_tokens,
       endpoint: r.endpoint,
       model_id: r.model_id,
-      apiProvider: r.api_provider
+      apiProvider: r.api_provider,
+      scores: r.scores ? (typeof r.scores === 'string' ? JSON.parse(r.scores) : r.scores) : null,
+      roles: r.roles ? (typeof r.roles === 'string' ? JSON.parse(r.roles) : r.roles) : []
     }))
     return cachedModels
   } catch (error) {

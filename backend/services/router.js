@@ -1,4 +1,5 @@
 const AIRouterService = require("./aiRouterService");
+const { getModelScore, SCORE_DIMENSIONS } = require("../data/modelScores");
 
 class AIRouter {
   constructor(models) {
@@ -171,6 +172,14 @@ class AIRouter {
   selectByQuality(models) {
     return models.reduce((best, current) => {
       const calculateQualityScore = (model) => {
+        const scoreEntry = getModelScore(model.id);
+        if (scoreEntry) {
+          // Use numeric scores — weight reasoning and knowledge highest
+          const s = scoreEntry.scores;
+          return (s.reasoning * 30) + (s.knowledge * 25) + (s.analysis * 20) +
+                 (s.code * 15) + (s.creativity * 10) + (s.instruction * 10);
+        }
+        // Fallback to old capability-based scoring
         let score = 0;
         if (model.capabilities.includes('thinking')) score += 100;
         if (model.capabilities.includes('reasoning')) score += 80;
@@ -193,13 +202,24 @@ class AIRouter {
 
     const scored = models.map((model) => {
       let qualityScore = 0;
-      if (model.capabilities.includes('thinking')) qualityScore += 50;
-      if (model.capabilities.includes('reasoning')) qualityScore += 40;
-      if (model.capabilities.includes('analysis')) qualityScore += 30;
-      if (model.capabilities.includes('code')) qualityScore += 25;
-      if (model.capabilities.includes('documentation')) qualityScore += 15;
+      const scoreEntry = getModelScore(model.id);
 
-      const normalizedQuality = qualityScore / 160;
+      if (scoreEntry) {
+        // Use numeric scores for quality assessment
+        const s = scoreEntry.scores;
+        qualityScore = (s.reasoning * 40) + (s.code * 25) + (s.analysis * 20) +
+                       (s.knowledge * 15) + (s.creativity * 10);
+      } else {
+        // Fallback to old capability-based scoring
+        if (model.capabilities.includes('thinking')) qualityScore += 50;
+        if (model.capabilities.includes('reasoning')) qualityScore += 40;
+        if (model.capabilities.includes('analysis')) qualityScore += 30;
+        if (model.capabilities.includes('code')) qualityScore += 25;
+        if (model.capabilities.includes('documentation')) qualityScore += 15;
+      }
+
+      const maxPossibleScore = scoreEntry ? 110 : 160; // Normalize based on method
+      const normalizedQuality = qualityScore / maxPossibleScore;
       const normalizedLatency = 1 - model.avgLatency / maxLatency;
       const finalScore = normalizedLatency * 0.6 + normalizedQuality * 0.4;
 

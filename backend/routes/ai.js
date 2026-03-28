@@ -8,9 +8,11 @@ const CohereProvider = require('../services/cohereProvider')
 const ConversationMemory = require('../services/conversationMemory')
 const PersistentMemoryService = require('../services/persistentMemoryService')
 const RelayService = require('../services/relayService')
+const HiveOrchestrator = require('../services/hiveOrchestrator')
 const { getModelsSync, loadModels } = require('../data/models')
 const { addMessage, getSession } = require('../data/sessions')
 const { query } = require('../data/db')
+const { getUserProfile } = require('../data/userProfile')  // Phase 7: Use proper profile parser
 const memoryService = require('../services/memoryService')
 
 const mistralProvider = new MistralProvider()
@@ -45,6 +47,34 @@ function getRelayService(models) {
     relayService = new RelayService(groqProvider, routerModel)
   }
   return relayService
+}
+
+/**
+ * Log orchestration data to the database.
+ */
+async function logOrchestration(logEntry) {
+  try {
+    await query(
+      `INSERT INTO orchestration_logs 
+       (session_id, user_question, is_complex, triage_scores, decomposition, strategies, execution_results, models_used, total_latency, total_tokens, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        logEntry.sessionId,
+        logEntry.userQuestion,
+        logEntry.isComplex,
+        JSON.stringify(logEntry.triageScores),
+        JSON.stringify(logEntry.decomposition),
+        JSON.stringify(logEntry.strategies),
+        JSON.stringify(logEntry.executionResults),
+        JSON.stringify(logEntry.modelsUsed),
+        logEntry.totalLatency,
+        logEntry.totalTokens,
+        logEntry.status
+      ]
+    )
+  } catch (err) {
+    console.error('Failed to log orchestration:', err.message)
+  }
 }
 
 router.post('/process', async (req, res) => {
@@ -96,13 +126,63 @@ router.post('/process', async (req, res) => {
       }
     }
 
-    // Combine all context sources (persistent context goes first)
+    // Combine all context sources
     const fullSystemContext = persistentContext + (systemContext || '') + contextPrefix + memoryContext
 
+    // ── HIVE MIND ROUTING ──
+    // Use orchestrated strategy (default) or fall back to legacy routing
+    const useHive = !strategy || strategy === 'ai-powered' || strategy === 'orchestrated'
+
+    if (useHive) {
+      // Build user context for the Hive Mind pipeline
+      const userProfile = await getUserProfile()
+      const userContext = {
+        profile: userProfile,
+        sessionContext: systemContext || '',
+        memoryContext: memoryContext || '',
+        lastSessionSummary: persistentContext || ''
+      }
+
+      const providers = {
+        mistral: mistralProvider,
+        cerebras: cerebrasProvider,
+        groq: groqProvider,
+        cohere: cohereProvider
+      }
+
+      const hive = new HiveOrchestrator(providers, models, userContext)
+      const result = await hive.process(input, fullSystemContext)
+
+      // Record messages to DB
+      if (sessionId) {
+        await addMessage(sessionId, { role: 'user', content: input })
+        await addMessage(sessionId, { role: 'assistant', content: result.output, model: result.model })
+        memory.recordExchange(sessionId, input, result.output, result.model)
+      }
+
+      // Log orchestration (non-blocking)
+      if (sessionId) {
+        const logEntry = hive.buildLogEntry(sessionId, input, result)
+        logOrchestration(logEntry).catch(() => {})
+      }
+
+      return res.json({
+        success: true,
+        input,
+        output: result.output,
+        model: result.model,
+        provider: result.provider,
+        decision: result.decision,
+        metrics: result.metrics,
+        orchestration: result.orchestration
+      })
+    }
+
+    // ── LEGACY ROUTING (for explicit strategy selection) ──
     const aiRouter = new AIRouter(models)
 
     const selectedModel = await aiRouter.selectModel({
-      strategy: strategy || 'ai-powered',
+      strategy: strategy || 'balanced',
       requiredCapabilities: requiredCapabilities || ['text-generation'],
       input
     })
@@ -111,9 +191,9 @@ router.post('/process', async (req, res) => {
       return res.status(503).json({ error: 'No suitable model available' })
     }
 
-    const decision = aiRouter.explainDecision(selectedModel, strategy || 'ai-powered')
-    decision.mode = 'auto'
-    console.log(`🎯 Selected: ${selectedModel.name}`)
+    const decision = aiRouter.explainDecision(selectedModel, strategy || 'balanced')
+    decision.mode = 'legacy'
+    console.log(`🎯 Legacy selected: ${selectedModel.name}`)
 
     let response
 
