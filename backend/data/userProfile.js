@@ -13,7 +13,7 @@ function parseJsonField(value) {
 
 /**
  * Get the user profile (single user assumption - id=1)
- * Includes Phase 7 fields: communication_style, sentiment_trend, expertise_levels, engagement_preferences
+ * Includes: communication_style, sentiment_trend, expertise_levels, engagement_preferences
  */
 async function getUserProfile() {
   const rows = await query('SELECT * FROM user_profiles WHERE id = 1')
@@ -27,7 +27,7 @@ async function getUserProfile() {
       interests: [],
       behavior_patterns: [],
       personal_facts: [],
-      // Phase 7 fields
+      // 
       communication_style: 'friendly',
       sentiment_trend: [],
       expertise_levels: {},
@@ -49,7 +49,7 @@ async function getUserProfile() {
     interests: parseJsonField(profile.interests) || [],
     behavior_patterns: parseJsonField(profile.behavior_patterns) || [],
     personal_facts: parseJsonField(profile.personal_facts) || [],
-    // Phase 7 fields
+    // 
     communication_style: profile.communication_style || 'friendly',
     sentiment_trend: parseJsonField(profile.sentiment_trend) || [],
     expertise_levels: parseJsonField(profile.expertise_levels) || {},
@@ -58,6 +58,8 @@ async function getUserProfile() {
       detailLevel: 'comprehensive',
       includeExamples: true
     },
+    // Phase 8
+    response_preferences: parseJsonField(profile.response_preferences) || {},
     created_at: profile.created_at,
     updated_at: profile.updated_at
   }
@@ -65,7 +67,7 @@ async function getUserProfile() {
 
 /**
  * Update the user profile with new information
- * Includes Phase 7 fields: communication_style, sentiment_trend, expertise_levels, engagement_preferences
+ * Includes : communication_style, sentiment_trend, expertise_levels, engagement_preferences
  */
 async function updateUserProfile(updates) {
   const fields = []
@@ -91,7 +93,7 @@ async function updateUserProfile(updates) {
     fields.push('personal_facts = ?')
     values.push(JSON.stringify(updates.personal_facts))
   }
-  // Phase 7 fields
+  // 
   if (updates.communication_style !== undefined) {
     fields.push('communication_style = ?')
     values.push(updates.communication_style)
@@ -107,6 +109,11 @@ async function updateUserProfile(updates) {
   if (updates.engagement_preferences !== undefined) {
     fields.push('engagement_preferences = ?')
     values.push(JSON.stringify(updates.engagement_preferences))
+  }
+  // Phase 8
+  if (updates.response_preferences !== undefined) {
+    fields.push('response_preferences = ?')
+    values.push(JSON.stringify(updates.response_preferences))
   }
 
   if (fields.length === 0) return getUserProfile()
@@ -189,55 +196,43 @@ async function mergeIntoProfile(extractedInfo) {
 
 /**
  * Build a human-readable summary of the user profile for AI context
- * Includes Phase 7 fields for enhanced personalization
+ * Includes enhanced personalization
  */
 function buildProfileContext(profile) {
   if (!profile) return ''
 
   const parts = []
 
-  if (profile.name) {
-    parts.push(`Name: ${profile.name}`)
-  }
+  // NOTE: Name is intentionally excluded from context.
+  // Sending the name causes models to name-drop in responses
+  // despite persona instructions saying not to.
 
-  if (profile.preferences && profile.preferences.length > 0) {
-    parts.push(`Preferences: ${profile.preferences.join('; ')}`)
-  }
-
-  if (profile.interests && profile.interests.length > 0) {
-    parts.push(`Interests: ${profile.interests.join(', ')}`)
-  }
-
-  if (profile.personal_facts && profile.personal_facts.length > 0) {
-    parts.push(`Known facts: ${profile.personal_facts.join('; ')}`)
-  }
-
-  if (profile.behavior_patterns && profile.behavior_patterns.length > 0) {
-    parts.push(`Behavior: ${profile.behavior_patterns.join('; ')}`)
-  }
-
-  // Phase 7 additions
+  // Only include communication style and expertise — the minimum needed to calibrate responses
   if (profile.communication_style && profile.communication_style !== 'friendly') {
-    parts.push(`Communication style: ${profile.communication_style}`)
+    parts.push(`Tone: ${profile.communication_style}`)
   }
 
   if (profile.expertise_levels && Object.keys(profile.expertise_levels).length > 0) {
     const expertiseStr = Object.entries(profile.expertise_levels)
       .map(([topic, level]) => `${topic}: ${level}`)
       .join(', ')
-    parts.push(`Expertise levels: ${expertiseStr}`)
+    parts.push(`Expertise: ${expertiseStr}`)
   }
+
+  // NOTE: interests and personal_facts are intentionally EXCLUDED.
+  // Even with "DO NOT MENTION" headers, models echo them in responses.
+  // These fields are stored for profile/memory page only, never sent to models.
 
   if (parts.length === 0) {
     return ''
   }
 
-  return `[About the User]\n${parts.join('\n')}`
+  return `[User Calibration — DO NOT MENTION]\n${parts.join('\n')}`
 }
 
 /**
  * Clear the user profile (reset to empty)
- * Resets all fields including Phase 7 additions
+ * Resets all fields 
  */
 async function clearUserProfile() {
   await query(
@@ -250,7 +245,8 @@ async function clearUserProfile() {
       communication_style = 'friendly',
       sentiment_trend = NULL,
       expertise_levels = NULL,
-      engagement_preferences = NULL
+      engagement_preferences = NULL,
+      response_preferences = NULL
     WHERE id = 1`
   )
   return getUserProfile()

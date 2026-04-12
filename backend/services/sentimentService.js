@@ -1,5 +1,5 @@
 /**
- * Sentiment Service — Phase 7: Conversational Intelligence
+ * Sentiment Service : Conversational Intelligence
  *
  * Detects user emotional state to adapt response tone.
  * Uses a fast heuristic-first approach with AI fallback for accuracy.

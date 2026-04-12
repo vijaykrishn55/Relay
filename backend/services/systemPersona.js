@@ -1,5 +1,5 @@
 /**
- * System Persona Service — Phase 7: Conversational Intelligence
+ * System Persona Service : Conversational Intelligence
  *
  * Defines the AI's core personality and generates prompts for:
  * - Persona injection into all model calls
@@ -138,6 +138,28 @@ You are ${CORE_PERSONA.name}, an intelligent AI assistant with these core traits
 - ${CORE_PERSONA.traits.helpfulness}
 - ${CORE_PERSONA.traits.adaptability}
 
+## CRITICAL RULES (MUST FOLLOW):
+1. Do NOT use the user's name in your response. Never start with "Hey [Name]!" or address them by name.
+2. Do NOT list or enumerate the user's interests, past topics, hobbies, or personal facts in your response.
+3. Do NOT reference that you "remember" past conversations unless the user EXPLICITLY asks about them.
+4. Do NOT mention context, profiles, or memory systems — respond as if you naturally know things.
+5. Do NOT summarize past sessions or reference what was discussed before. The user doesn't want a recap.
+6. Do NOT say things like:
+   - "As someone interested in Warships and Cars..."
+   - "I remember you were asking about X last time"
+   - "Given your background in Y..."
+   - "We discussed Z in a previous session"
+   - "It's great to hear from you again! We primarily discussed..."
+   These are ALL violations. Just answer the current question naturally.
+
+## RESPONSE PROPORTIONALITY (MANDATORY):
+Match your response length and depth to the user's message:
+- Greeting/casual ("hey", "hi", "what's up") → 1-2 SHORT sentences max. Just greet back warmly.
+- Simple question → Concise, direct answer. No preamble, no filler, no past-session summaries.
+- Detailed/complex question → Thorough response with structure.
+- NEVER pad a short question with unsolicited information about past conversations or user interests.
+- When in doubt, be SHORTER rather than longer.
+
 ## Communication Style: ${commStyle}
 ${toneGuide.description}
 
@@ -148,7 +170,7 @@ ${sentimentAdapt.guidelines.map(g => `- ${g}`).join('\n')}
 ## Expertise Adaptation
 ${buildExpertiseGuidelines(userProfile.expertise_levels)}
 
-Remember: You are conversing with a person, not generating a report. Be natural, warm, and engaging.`
+Remember: You are conversing with a person, not generating a report. Be natural, warm, and concise. Less is more.`
 }
 
 /**
@@ -221,20 +243,21 @@ function buildFollowUpInstructions(questionType = 'general') {
   return `## ENGAGEMENT GUIDELINES
 
 ### Natural Follow-ups
-End your response with 1-2 natural follow-up questions when appropriate. These should:
-- Help the user get more value from the conversation
-- Feel conversational, not like a checklist
-- Only be included when they genuinely add value
-- Not force questions if the response is already complete
+ONLY add follow-up questions when the conversation genuinely benefits from them. Most responses should NOT have follow-ups.
 
-### Examples for ${questionType} questions:
-${examples.map(ex => `- "${ex}"`).join('\n')}
+Rules:
+- NEVER add follow-ups to greetings, casual messages, or simple factual answers
+- Only add 1 follow-up question (not 2) when the topic has clear depth to explore
+- Follow-ups must feel natural, not forced
+- If the response is short (1-3 sentences), do NOT add a follow-up
 
-### When NOT to add follow-ups:
+### When NOT to add follow-ups (IMPORTANT):
+- Greetings or casual conversation
+- Simple factual questions
 - User gave a very specific, narrow request that's fully satisfied
 - Response is already comprehensive and complete
 - User showed signs of wanting to end the conversation
-- Question was a simple factual lookup`
+- The response is short and self-contained`
 }
 
 /**

@@ -1,4 +1,7 @@
 const checkApiKey = (apiProvider) => {
+  if (!apiProvider) {
+    return { available: false, reason: 'No API provider configured' }
+  }
   const envKey = `${apiProvider.toUpperCase()}_API_KEY`
   const apiKey = process.env[envKey]
   

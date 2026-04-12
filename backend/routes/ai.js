@@ -9,10 +9,12 @@ const ConversationMemory = require('../services/conversationMemory')
 const PersistentMemoryService = require('../services/persistentMemoryService')
 const RelayService = require('../services/relayService')
 const HiveOrchestrator = require('../services/hiveOrchestrator')
+const RelayPipeline = require('../services/relayPipeline')  // Phase 8
+const UserPatternService = require('../services/userPatternService')  // Phase 8
 const { getModelsSync, loadModels } = require('../data/models')
-const { addMessage, getSession } = require('../data/sessions')
+const { addMessage, getSession, updateSession } = require('../data/sessions')
 const { query } = require('../data/db')
-const { getUserProfile } = require('../data/userProfile')  // Phase 7: Use proper profile parser
+const { getUserProfile } = require('../data/userProfile')
 const memoryService = require('../services/memoryService')
 
 const mistralProvider = new MistralProvider()
@@ -77,9 +79,41 @@ async function logOrchestration(logEntry) {
   }
 }
 
+/**
+ * Auto-title a session based on the user's first message.
+ * Only updates if the session title is still the default "New Chat".
+ */
+async function autoTitleSession(sessionId, userInput) {
+  try {
+    const session = await getSession(sessionId)
+    if (!session) return
+    // Only auto-title if it's still "New Chat" (default)
+    if (session.title && session.title !== 'New Chat') return
+
+    // Generate a short title from the user's input
+    let title = userInput.trim()
+    // Remove newlines
+    title = title.replace(/[\r\n]+/g, ' ')
+    // Cap at 60 chars, break at word boundary
+    if (title.length > 60) {
+      title = title.substring(0, 60)
+      const lastSpace = title.lastIndexOf(' ')
+      if (lastSpace > 20) title = title.substring(0, lastSpace)
+      title += '...'
+    }
+    // Capitalize first letter
+    title = title.charAt(0).toUpperCase() + title.slice(1)
+
+    await updateSession(sessionId, { title })
+    console.log(`📝 Auto-titled session ${sessionId}: "${title}"`)
+  } catch (err) {
+    console.error('Auto-title failed:', err.message)
+  }
+}
+
 router.post('/process', async (req, res) => {
   try {
-    const { input, strategy, requiredCapabilities, sessionId } = req.body
+    const { input, strategy, requiredCapabilities, sessionId, mode } = req.body
 
     if (!input || input.trim() === '') {
       return res.status(400).json({ error: 'Input is required' })
@@ -88,6 +122,26 @@ router.post('/process', async (req, res) => {
     const models = await loadModels()
     const memory = getConversationMemory(models)
     const persistent = getPersistentMemory(models)
+
+    // ── CRITICAL FIX: Load actual in-session message history ──
+    let conversationHistory = []
+    if (sessionId) {
+      try {
+        const recentMessages = await query(
+          `SELECT role, content FROM messages WHERE session_id = ? ORDER BY timestamp DESC LIMIT 10`,
+          [sessionId]
+        )
+        if (recentMessages && recentMessages.length > 0) {
+          conversationHistory = recentMessages.reverse().map(m => ({
+            role: m.role,
+            content: m.content
+          }))
+          console.log(`💬 Loaded ${conversationHistory.length} in-session messages for context`)
+        }
+      } catch (err) {
+        console.error('Failed to load in-session messages:', err.message)
+      }
+    }
 
     // Build persistent context (user profile + last session summary)
     let persistentContext = ''
@@ -126,15 +180,36 @@ router.post('/process', async (req, res) => {
       }
     }
 
-    // Combine all context sources
-    const fullSystemContext = persistentContext + (systemContext || '') + contextPrefix + memoryContext
+    // Combine all context sources — deduplicate and cap total size
+    const MAX_CONTEXT_CHARS = 6000
+    const contextParts = []
+
+    // Priority 1: Context-seeded session messages
+    if (contextPrefix) {
+      contextParts.push(contextPrefix)
+    }
+
+    // Priority 2: Memory context (saved memories matching query)
+    if (memoryContext) {
+      contextParts.push(memoryContext)
+    }
+
+    // Priority 3: Persistent context (user profile + last session summary)
+    if (persistentContext) {
+      contextParts.push(persistentContext)
+    }
+
+    // Join and cap
+    let fullSystemContext = contextParts.filter(Boolean).join('\n\n')
+    if (fullSystemContext.length > MAX_CONTEXT_CHARS) {
+      fullSystemContext = fullSystemContext.substring(0, MAX_CONTEXT_CHARS)
+    }
 
     // ── HIVE MIND ROUTING ──
-    // Use orchestrated strategy (default) or fall back to legacy routing
+    // mode='hive' forces full pipeline, otherwise auto-triage
     const useHive = !strategy || strategy === 'ai-powered' || strategy === 'orchestrated'
 
     if (useHive) {
-      // Build user context for the Hive Mind pipeline
       const userProfile = await getUserProfile()
       const userContext = {
         profile: userProfile,
@@ -151,13 +226,16 @@ router.post('/process', async (req, res) => {
       }
 
       const hive = new HiveOrchestrator(providers, models, userContext)
-      const result = await hive.process(input, fullSystemContext)
+      const result = await hive.process(input, fullSystemContext, conversationHistory, mode === 'hive')
 
       // Record messages to DB
       if (sessionId) {
         await addMessage(sessionId, { role: 'user', content: input })
         await addMessage(sessionId, { role: 'assistant', content: result.output, model: result.model })
         memory.recordExchange(sessionId, input, result.output, result.model)
+
+        // Auto-title session on first exchange
+        autoTitleSession(sessionId, input).catch(() => {})
       }
 
       // Log orchestration (non-blocking)
@@ -196,29 +274,24 @@ router.post('/process', async (req, res) => {
     console.log(`🎯 Legacy selected: ${selectedModel.name}`)
 
     let response
-
-    switch (selectedModel.apiProvider) {
-      case 'mistral':
-        response = await mistralProvider.callModel(selectedModel, input, fullSystemContext)
-        break
-      case 'cerebras':
-        response = await cerebrasProvider.callModel(selectedModel, input, fullSystemContext)
-        break
-      case 'groq':
-        response = await groqProvider.callModel(selectedModel, input, fullSystemContext)
-        break
-      case 'cohere':
-        response = await cohereProvider.callModel(selectedModel, input, fullSystemContext)
-        break
-      default:
-        throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
+    const providerMap = {
+      mistral: mistralProvider,
+      cerebras: cerebrasProvider,
+      groq: groqProvider,
+      cohere: cohereProvider
     }
+    const provider = providerMap[selectedModel.apiProvider]
+    if (!provider) throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
+    response = await provider.callModel(selectedModel, input, fullSystemContext, conversationHistory)
 
     // Record messages to DB (non-blocking)
     if (sessionId) {
       await addMessage(sessionId, {role: 'user', content: input})
       await addMessage(sessionId, {role: 'assistant', content: response.output, model: selectedModel.name})
       memory.recordExchange(sessionId, input, response.output, selectedModel.name)
+
+      // Auto-title session on first exchange
+      autoTitleSession(sessionId, input).catch(() => {})
     }
 
     res.json({
@@ -241,26 +314,83 @@ router.post('/process', async (req, res) => {
   }
 })
 
+// ── Context Info — for the context meter UI ──
+router.get('/context-info/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const messages = await query(
+      'SELECT role, content FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
+      [sessionId]
+    )
+    let totalChars = 0
+    for (const m of messages) {
+      totalChars += (m.content || '').length
+    }
+    totalChars += 500 // system prompt overhead
+    const estimatedTokens = Math.round(totalChars / 4)
+    res.json({ success: true, estimatedTokens, messageCount: messages.length })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 // ── Relay: Follow-Up — regenerate a response with follow-up context ──
 router.post('/relay-followup', async (req, res) => {
   try {
     const {
       sessionId,
       targetMessageIndex,
-      originalQuestion,
-      originalResponse,
       followUpQuestion
     } = req.body
+
+    // Allow these to be optional — derive from DB if missing
+    let { originalQuestion, originalResponse } = req.body
 
     if (!followUpQuestion || !followUpQuestion.trim()) {
       return res.status(400).json({ error: 'Follow-up question is required' })
     }
-    if (!originalResponse || !originalQuestion) {
-      return res.status(400).json({ error: 'Original question and response are required' })
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' })
     }
 
     const models = await loadModels()
     const relay = getRelayService(models)
+
+    // ── Defensive: derive originalQuestion & originalResponse from DB if not provided ──
+    let resolvedTargetIndex = targetMessageIndex
+    const allMessages = await query(
+      'SELECT id, role, content, relay_followups FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
+      [sessionId]
+    )
+
+    // If targetMessageIndex not provided, default to last assistant message
+    if (resolvedTargetIndex === undefined || resolvedTargetIndex === null) {
+      for (let i = allMessages.length - 1; i >= 0; i--) {
+        if (allMessages[i].role === 'assistant') {
+          resolvedTargetIndex = i
+          break
+        }
+      }
+    }
+
+    const targetMessage = allMessages[resolvedTargetIndex]
+
+    if (!originalResponse && targetMessage) {
+      originalResponse = targetMessage.content || ''
+    }
+    if (!originalQuestion) {
+      for (let i = (resolvedTargetIndex || 0) - 1; i >= 0; i--) {
+        if (allMessages[i].role === 'user') {
+          originalQuestion = allMessages[i].content
+          break
+        }
+      }
+      if (!originalQuestion) originalQuestion = '(no prior question found)'
+    }
+
+    if (!originalResponse || !originalQuestion) {
+      return res.status(400).json({ error: 'Could not determine original question and response' })
+    }
 
     // Build the merged prompt
     const mergedInput = relay.buildFollowUpPrompt(
@@ -275,7 +405,6 @@ router.post('/relay-followup', async (req, res) => {
 
     let persistentContext = ''
     let systemContext = null
-    let contextPrefix = ''
 
     if (sessionId) {
       try {
@@ -284,89 +413,70 @@ router.post('/relay-followup', async (req, res) => {
         console.error('Failed to load persistent context:', err.message)
       }
       systemContext = await memory.buildContext(sessionId)
-
-      const session = await getSession(sessionId)
-      if (session && session.context_messages && session.context_messages.length > 0) {
-        const contextBlock = session.context_messages
-          .map(m => `[${m.role}]: ${m.content}`)
-          .join('\n')
-        contextPrefix = `\n\n[Context from a previous conversation]\n${contextBlock}\n`
-      }
     }
 
     const memoryContext = await memoryService.buildMemoryContext(followUpQuestion)
-    const fullSystemContext = persistentContext + (systemContext || '') + contextPrefix + memoryContext
 
-    // Route to a model and call
-    const aiRouter = new AIRouter(models)
-    const selectedModel = await aiRouter.selectModel({
-      strategy: 'ai-powered',
-      requiredCapabilities: ['text-generation'],
-      input: mergedInput
-    })
-
-    if (!selectedModel) {
-      return res.status(503).json({ error: 'No suitable model available' })
+    // ── Phase 8: Use RelayPipeline instead of legacy AIRouter ──
+    const userProfile = await getUserProfile()
+    const userContext = {
+      profile: userProfile,
+      sessionContext: systemContext || '',
+      memoryContext: memoryContext || '',
+      lastSessionSummary: persistentContext || ''
     }
 
-    let response
-    switch (selectedModel.apiProvider) {
-      case 'mistral':
-        response = await mistralProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-        break
-      case 'cerebras':
-        response = await cerebrasProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-        break
-      case 'groq':
-        response = await groqProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-        break
-      case 'cohere':
-        response = await cohereProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-        break
-      default:
-        throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
+    const providers = {
+      mistral: mistralProvider,
+      cerebras: cerebrasProvider,
+      groq: groqProvider,
+      cohere: cohereProvider
     }
+
+    const relayPipeline = new RelayPipeline(providers, models, userContext)
+    const result = await relayPipeline.process(
+      followUpQuestion.trim(),
+      sessionId,
+      originalQuestion,
+      originalResponse
+    )
 
     // Update the original AI message in the database in-place
-    if (sessionId) {
+    if (targetMessage) {
       try {
-        const allMessages = await query(
-          'SELECT id, relay_followups FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
-          [sessionId]
+        const dbMessageId = targetMessage.id
+        let existingFollowups = []
+        try {
+          const raw = targetMessage.relay_followups
+          existingFollowups = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []
+        } catch { existingFollowups = [] }
+
+        existingFollowups.push(followUpQuestion.trim())
+
+        await query(
+          'UPDATE messages SET content = ?, model = ?, relay_followups = ? WHERE id = ?',
+          [result.output, result.model, JSON.stringify(existingFollowups), dbMessageId]
         )
-
-        if (allMessages[targetMessageIndex]) {
-          const dbMessageId = allMessages[targetMessageIndex].id
-          let existingFollowups = []
-          try {
-            const raw = allMessages[targetMessageIndex].relay_followups
-            existingFollowups = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []
-          } catch { existingFollowups = [] }
-
-          existingFollowups.push(followUpQuestion.trim())
-
-          await query(
-            'UPDATE messages SET content = ?, model = ?, relay_followups = ? WHERE id = ?',
-            [response.output, selectedModel.name, JSON.stringify(existingFollowups), dbMessageId]
-          )
-        }
       } catch (dbErr) {
         console.error('Failed to update message in DB:', dbErr.message)
       }
+
+      // Phase 8: Record follow-up pattern (non-blocking)
+      const patternService = new UserPatternService()
+      patternService.recordFeedback('follow_up', { sessionId }).catch(() => {})
     }
 
-    console.log(`🔄 Relay follow-up processed for session ${sessionId}, message index ${targetMessageIndex}`)
+    console.log(`🔄 Relay follow-up processed via Phase 8 pipeline for session ${sessionId}`)
 
     res.json({
       success: true,
-      output: response.output,
-      model: selectedModel.name,
-      targetMessageIndex,
-      metrics: {
-        latency: response.latency,
-        cost: response.cost,
-        tokensUsed: response.tokensUsed
-      }
+      action: 'follow_up',
+      output: result.output,
+      model: result.model,
+      targetMessageIndex: resolvedTargetIndex,
+      followUpQuestion: followUpQuestion.trim(),
+      metrics: result.metrics,
+      orchestration: result.orchestration
     })
 
   } catch (error) {
@@ -423,20 +533,66 @@ router.post('/relay-smart', async (req, res) => {
     const {
       sessionId,
       targetMessageIndex,
-      originalQuestion,
-      originalResponse,
       userInput
     } = req.body
+
+    // Allow these to be optional — we'll derive them from DB if missing
+    let { originalQuestion, originalResponse } = req.body
 
     if (!userInput || !userInput.trim()) {
       return res.status(400).json({ error: 'User input is required' })
     }
-    if (!originalResponse || !originalQuestion) {
-      return res.status(400).json({ error: 'Original question and response are required' })
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' })
     }
 
     const models = await loadModels()
     const relay = getRelayService(models)
+
+    // ── Defensive: derive originalQuestion & originalResponse from DB if not provided ──
+    let resolvedTargetIndex = targetMessageIndex
+    const allMessages = await query(
+      'SELECT id, role, content, relay_followups FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
+      [sessionId]
+    )
+
+    if (allMessages.length === 0) {
+      return res.status(400).json({ error: 'No messages found in this session' })
+    }
+
+    // If targetMessageIndex not provided, default to last assistant message
+    if (resolvedTargetIndex === undefined || resolvedTargetIndex === null) {
+      for (let i = allMessages.length - 1; i >= 0; i--) {
+        if (allMessages[i].role === 'assistant') {
+          resolvedTargetIndex = i
+          break
+        }
+      }
+    }
+
+    if (resolvedTargetIndex === undefined || resolvedTargetIndex === null || !allMessages[resolvedTargetIndex]) {
+      return res.status(400).json({ error: 'Could not find target AI message in session' })
+    }
+
+    const targetMessage = allMessages[resolvedTargetIndex]
+
+    // Derive originalResponse from DB if not provided
+    if (!originalResponse) {
+      originalResponse = targetMessage.content || ''
+    }
+
+    // Derive originalQuestion: find the user message immediately preceding the target
+    if (!originalQuestion) {
+      for (let i = resolvedTargetIndex - 1; i >= 0; i--) {
+        if (allMessages[i].role === 'user') {
+          originalQuestion = allMessages[i].content
+          break
+        }
+      }
+      if (!originalQuestion) {
+        originalQuestion = '(no prior question found)'
+      }
+    }
 
     // Step 1: Classify intent
     const classification = await relay.classifyIntent(
@@ -449,104 +605,77 @@ router.post('/relay-smart', async (req, res) => {
 
     // ── FOLLOW-UP: regenerate in-place ──
     if (classification.intent === 'follow_up') {
-      const mergedInput = relay.buildFollowUpPrompt(
-        originalQuestion,
-        originalResponse,
-        userInput.trim()
-      )
-
-      const persistent = getPersistentMemory(models)
+      // ── Phase 8: Use RelayPipeline instead of legacy AIRouter ──
+      const memoryContext = await memoryService.buildMemoryContext(userInput)
+      const userProfile = await getUserProfile()
       const memory = getConversationMemory(models)
+      const persistent = getPersistentMemory(models)
 
       let persistentContext = ''
       let systemContext = null
-      let contextPrefix = ''
+      try {
+        persistentContext = await persistent.buildPersistentContext(sessionId)
+      } catch (err) {
+        console.error('Failed to load persistent context:', err.message)
+      }
+      systemContext = await memory.buildContext(sessionId)
 
-      if (sessionId) {
-        try {
-          persistentContext = await persistent.buildPersistentContext(sessionId)
-        } catch (err) {
-          console.error('Failed to load persistent context:', err.message)
-        }
-        systemContext = await memory.buildContext(sessionId)
-
-        const session = await getSession(sessionId)
-        if (session && session.context_messages && session.context_messages.length > 0) {
-          const contextBlock = session.context_messages
-            .map(m => `[${m.role}]: ${m.content}`)
-            .join('\n')
-          contextPrefix = `\n\n[Context from a previous conversation]\n${contextBlock}\n`
-        }
+      const userContext = {
+        profile: userProfile,
+        sessionContext: systemContext || '',
+        memoryContext: memoryContext || '',
+        lastSessionSummary: persistentContext || ''
       }
 
-      const memoryContext = await memoryService.buildMemoryContext(userInput)
-      const fullSystemContext = persistentContext + (systemContext || '') + contextPrefix + memoryContext
-
-      const aiRouter = new AIRouter(models)
-      const selectedModel = await aiRouter.selectModel({
-        strategy: 'ai-powered',
-        requiredCapabilities: ['text-generation'],
-        input: mergedInput
-      })
-
-      if (!selectedModel) {
-        return res.status(503).json({ error: 'No suitable model available' })
+      const providers = {
+        mistral: mistralProvider,
+        cerebras: cerebrasProvider,
+        groq: groqProvider,
+        cohere: cohereProvider
       }
 
-      let response
-      switch (selectedModel.apiProvider) {
-        case 'mistral':
-          response = await mistralProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-          break
-        case 'cerebras':
-          response = await cerebrasProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-          break
-        case 'groq':
-          response = await groqProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-          break
-        case 'cohere':
-          response = await cohereProvider.callModel(selectedModel, mergedInput, fullSystemContext)
-          break
-        default:
-          throw new Error(`Unknown provider: ${selectedModel.apiProvider}`)
-      }
+      const relayPipeline = new RelayPipeline(providers, models, userContext)
+      const result = await relayPipeline.process(
+        userInput.trim(),
+        sessionId,
+        originalQuestion,
+        originalResponse
+      )
 
       // Update DB in-place
-      if (sessionId) {
+      try {
+        const dbMessageId = targetMessage.id
+        let existingFollowups = []
         try {
-          const allMessages = await query(
-            'SELECT id, relay_followups FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
-            [sessionId]
-          )
+          const raw = targetMessage.relay_followups
+          existingFollowups = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []
+        } catch { existingFollowups = [] }
 
-          if (allMessages[targetMessageIndex]) {
-            const dbMessageId = allMessages[targetMessageIndex].id
-            let existingFollowups = []
-            try {
-              const raw = allMessages[targetMessageIndex].relay_followups
-              existingFollowups = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []
-            } catch { existingFollowups = [] }
+        existingFollowups.push(userInput.trim())
 
-            existingFollowups.push(userInput.trim())
-
-            await query(
-              'UPDATE messages SET content = ?, model = ?, relay_followups = ? WHERE id = ?',
-              [response.output, selectedModel.name, JSON.stringify(existingFollowups), dbMessageId]
-            )
-          }
-        } catch (dbErr) {
-          console.error('Failed to update message in DB:', dbErr.message)
-        }
+        await query(
+          'UPDATE messages SET content = ?, model = ?, relay_followups = ? WHERE id = ?',
+          [result.output, result.model, JSON.stringify(existingFollowups), dbMessageId]
+        )
+      } catch (dbErr) {
+        console.error('Failed to update message in DB:', dbErr.message)
       }
 
-      console.log(`🔄 Relay follow-up processed for session ${sessionId}`)
+      // Phase 8: Record follow-up pattern (non-blocking)
+      const patternService = new UserPatternService()
+      patternService.recordFeedback('follow_up', { sessionId }).catch(() => {})
+
+      console.log(`🔄 Relay smart follow-up processed via Phase 8 pipeline for session ${sessionId}`)
 
       return res.json({
         success: true,
         action: 'follow_up',
-        output: response.output,
-        model: selectedModel.name,
-        targetMessageIndex
+        output: result.output,
+        model: result.model,
+        targetMessageIndex: resolvedTargetIndex,
+        followUpQuestion: userInput.trim(),
+        metrics: result.metrics,
+        orchestration: result.orchestration
       })
     }
 
@@ -608,8 +737,74 @@ router.post('/relay-smart', async (req, res) => {
       })
     }
 
-    // Fallback — treat as follow-up
-    return res.status(400).json({ error: 'Could not determine intent' })
+    // Fallback — couldn't classify, treat as follow-up
+    console.warn(`⚠️ Relay intent unclear, defaulting to follow-up`)
+    // Re-run through this same handler as follow_up by overriding classification
+    const memoryContext = await memoryService.buildMemoryContext(userInput)
+    const userProfile = await getUserProfile()
+    const memory = getConversationMemory(models)
+    const persistent = getPersistentMemory(models)
+
+    let persistentContext = ''
+    let systemContext = null
+    try {
+      persistentContext = await persistent.buildPersistentContext(sessionId)
+    } catch (err) {
+      console.error('Failed to load persistent context:', err.message)
+    }
+    systemContext = await memory.buildContext(sessionId)
+
+    const userContext = {
+      profile: userProfile,
+      sessionContext: systemContext || '',
+      memoryContext: memoryContext || '',
+      lastSessionSummary: persistentContext || ''
+    }
+
+    const providers = {
+      mistral: mistralProvider,
+      cerebras: cerebrasProvider,
+      groq: groqProvider,
+      cohere: cohereProvider
+    }
+
+    const relayPipeline = new RelayPipeline(providers, models, userContext)
+    const result = await relayPipeline.process(
+      userInput.trim(),
+      sessionId,
+      originalQuestion,
+      originalResponse
+    )
+
+    // Update DB
+    try {
+      const dbMessageId = targetMessage.id
+      let existingFollowups = []
+      try {
+        const raw = targetMessage.relay_followups
+        existingFollowups = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []
+      } catch { existingFollowups = [] }
+
+      existingFollowups.push(userInput.trim())
+
+      await query(
+        'UPDATE messages SET content = ?, model = ?, relay_followups = ? WHERE id = ?',
+        [result.output, result.model, JSON.stringify(existingFollowups), dbMessageId]
+      )
+    } catch (dbErr) {
+      console.error('Failed to update message in DB:', dbErr.message)
+    }
+
+    return res.json({
+      success: true,
+      action: 'follow_up',
+      output: result.output,
+      model: result.model,
+      targetMessageIndex: resolvedTargetIndex,
+      followUpQuestion: userInput.trim(),
+      metrics: result.metrics,
+      orchestration: result.orchestration
+    })
 
   } catch (error) {
     console.error('Smart relay error:', error)

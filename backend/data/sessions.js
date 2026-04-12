@@ -96,23 +96,33 @@ async function addMessage(sessionId, message) {
 async function createSessionWithContext(contextMessages, parentSessionId = null, relayTopic = null) {
   const id = uuidv4()
 
+  // Auto-title with topic name if available, otherwise default to 'New Chat'
+  let title = 'New Chat'
+  if (relayTopic && relayTopic.trim()) {
+    // Capitalize first letter and truncate
+    const cleaned = relayTopic.trim()
+    title = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+    if (title.length > 80) {
+      title = title.substring(0, 80)
+      const lastSpace = title.lastIndexOf(' ')
+      if (lastSpace > 30) title = title.substring(0, lastSpace)
+      title += '...'
+    }
+  }
+
   await query(
     `INSERT INTO sessions (id, title, context_messages, parent_session_id, relay_topic, created_at, updated_at)
-     VALUES (?, 'New Chat', ?, ?, ?, NOW(), NOW())`,
-    [id, JSON.stringify(contextMessages), parentSessionId, relayTopic]
+     VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+    [id, title, JSON.stringify(contextMessages), parentSessionId, relayTopic]
   )
 
-  // Update parent session's updated_at so it stays relevant in the sidebar
-  if (parentSessionId) {
-    await query(
-      'UPDATE sessions SET updated_at = NOW() WHERE id = ?',
-      [parentSessionId]
-    )
-  }
+  // NOTE: We intentionally do NOT update the parent session's updated_at here.
+  // Doing so would cause old sessions to jump to position #2 in the sidebar
+  // whenever the user references them in a new relay/context session.
 
   return {
     id,
-    title: 'New Chat',
+    title,
     context_messages: contextMessages,
     parent_session_id: parentSessionId,
     relay_topic: relayTopic,

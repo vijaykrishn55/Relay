@@ -1,7 +1,4 @@
 /**
- * Assembler Service — Phase 6: Hive Mind (Phase 4)
- * Enhanced in Phase 7: Conversational Intelligence
- *
  * Model F — the Finalizer. Combines all sub-task outputs into a single,
  * polished, cohesive response using user context for styling.
  * Now includes persona injection and engagement guidelines.
@@ -23,16 +20,15 @@ class AssemblerService {
 
   /**
    * Assemble all sub-task outputs into a final response.
-   * 
    * @param {string} userQuestion    - Original user question
-   * @param {object} decomposition   - Phase 1 output
-   * @param {object} strategyResult  - Phase 2 output
-   * @param {object} executionResult - Phase 3 output
+   * @param {object} decomposition   - phase 1 output
+   * @param {object} strategyResult  - phase 2 output
+   * @param {object} executionResult - phase 3 output
    * @param {object} userContext      - { profile, sessionContext, memoryContext }
-   * @param {object} phaseSummaries   - { decomposition, strategy, execution }
+   * @param {object} optSummaries   - { decomposition, strategy, execution }
    * @returns {{ output: string, model: string, latency: number }}
    */
-  async assemble(userQuestion, decomposition, strategyResult, executionResult, userContext, phaseSummaries) {
+  async assemble(userQuestion, decomposition, strategyResult, executionResult, userContext, optSummaries) {
     // Select Model F — prefer assemblers, need high quality
     const assemblerScores = {
       reasoning: 0.7,
@@ -59,7 +55,7 @@ class AssemblerService {
 
     // Build the assembly prompt
     const assemblyPrompt = this._buildAssemblyPrompt(
-      userQuestion, decomposition, strategyResult, executionResult, userContext, phaseSummaries
+      userQuestion, decomposition, strategyResult, executionResult, userContext, optSummaries
     )
 
     try {
@@ -118,10 +114,10 @@ class AssemblerService {
 
   /**
    * Build the comprehensive assembly prompt for Model F.
-   * Enhanced with Phase 7 persona and engagement guidelines.
+   * Enhanced with opt 7 persona and engagement guidelines.
    * @private
    */
-  _buildAssemblyPrompt(userQuestion, decomposition, strategyResult, executionResult, userContext, phaseSummaries) {
+  _buildAssemblyPrompt(userQuestion, decomposition, strategyResult, executionResult, userContext, optSummaries) {
     // Build sub-task outputs section
     const subtaskOutputs = decomposition.subtasks.map(st => {
       const result = executionResult.results[st.id]
@@ -135,23 +131,23 @@ class AssemblerService {
     const styleGuidelines = this._buildStyleGuidelines(userContext)
 
     // Build phase summary overview
-    const summaryOverview = `Phase 1 (Decomposition): ${decomposition.subtasks.length} sub-tasks identified, types: ${decomposition.subtasks.map(s => s.type).join(', ')}
-Phase 2 (Strategy): Models assigned — ${strategyResult.strategies.map(s => `${s.subtaskId}→${s.selectedModelName}`).join(', ')}
-Phase 3 (Execution): ${Object.values(executionResult.results).filter(r => r.status === 'success').length}/${decomposition.subtasks.length} succeeded`
+    const summaryOverview = `phase 1 (Decomposition): ${decomposition.subtasks.length} sub-tasks identified, types: ${decomposition.subtasks.map(s => s.type).join(', ')}
+phase 2 (Strategy): Models assigned — ${strategyResult.strategies.map(s => `${s.subtaskId}→${s.selectedModelName}`).join(', ')}
+phase 3 (Execution): ${Object.values(executionResult.results).filter(r => r.status === 'success').length}/${decomposition.subtasks.length} succeeded`
 
-    // Phase 7: Build persona prompt
+    //  Build persona prompt
     const personaPrompt = buildPersonaPrompt(userContext.profile || {}, userContext.sentiment || {})
 
-    // Phase 7: Determine primary question type for follow-up guidance
+    // Determine primary question type for follow-up guidance
     const primaryType = decomposition.subtasks[0]?.type || 'general'
     const followUpGuide = buildFollowUpInstructions(primaryType)
 
-    // Phase 7: Sentiment-specific guidance
+    // Sentiment-specific guidance
     const sentimentGuidance = this._buildSentimentGuidance(userContext.sentiment)
 
     return `${personaPrompt}
 
-You are the Final Assembler (Model F). Multiple AI models have worked together to answer a user's question.
+You are the Final Assembler. Multiple AI models have worked together to answer a user's question.
 Your job is to combine their outputs into ONE seamless, polished, ENGAGING response.
 
 ORIGINAL USER QUESTION:
@@ -165,7 +161,7 @@ ${subtaskOutputs}
 
 ASSEMBLY INSTRUCTIONS — FOLLOW THESE EXACTLY:
 1. Combine all sub-task outputs into a SINGLE coherent response
-2. DO NOT mention sub-tasks, phases, models, or that multiple AIs were used — the user should see ONE clean answer
+2. DO NOT mention sub-tasks, opts, models, or that multiple AIs were used — the user should see ONE clean answer
 3. Arrange sections in the most LOGICAL order for a reader (may differ from sub-task order)
 4. Fix INCONSISTENCIES between outputs (e.g., variable names in code should match explanations)
 5. Add SMOOTH TRANSITIONS between sections — no abrupt topic jumps
@@ -188,6 +184,13 @@ ${styleGuidelines}
 ${sentimentGuidance}
 
 ${followUpGuide}
+
+## CRITICAL: RESPONSE PROPORTIONALITY
+Match your response length to the user's question:
+- If the question is casual/simple (greeting, short question) → keep the answer SHORT (1-4 sentences)
+- NEVER list the user's interests, past topics, or personal facts
+- NEVER reference that you "remember" things or that context was provided
+- When in doubt, be more concise
 
 OUTPUT: Write the final response directly. No JSON, no meta-commentary, no wrapping — just the polished, engaging answer.`
   }
@@ -212,7 +215,7 @@ ${adapt.guidelines.map(g => `- ${g}`).join('\n')}`
 
   /**
    * Build user-specific style guidelines for the assembly prompt.
-   * Enhanced with Phase 7 communication style and expertise levels.
+   * Enhanced communication style and expertise levels.
    * @private
    */
   _buildStyleGuidelines(userContext) {
@@ -221,7 +224,7 @@ ${adapt.guidelines.map(g => `- ${g}`).join('\n')}`
     if (userContext.profile) {
       const p = userContext.profile
 
-      // Phase 7: Communication style
+      // Communication style
       if (p.communication_style) {
         const styleDescriptions = {
           formal: 'Use professional language, complete sentences, structured responses',
@@ -233,7 +236,7 @@ ${adapt.guidelines.map(g => `- ${g}`).join('\n')}`
         guidelines.push(`- Communication style: ${p.communication_style} — ${styleDescriptions[p.communication_style] || ''}`)
       }
 
-      // Phase 7: Expertise levels
+      // Expertise levels
       if (p.expertise_levels) {
         const levels = typeof p.expertise_levels === 'string' ? JSON.parse(p.expertise_levels) : p.expertise_levels
         if (typeof levels === 'object' && Object.keys(levels).length > 0) {
@@ -244,7 +247,7 @@ ${adapt.guidelines.map(g => `- ${g}`).join('\n')}`
         }
       }
 
-      // Phase 7: Engagement preferences
+      // Engagement preferences
       if (p.engagement_preferences) {
         const prefs = typeof p.engagement_preferences === 'string' ? JSON.parse(p.engagement_preferences) : p.engagement_preferences
         if (prefs.detailLevel) {
@@ -264,9 +267,7 @@ ${adapt.guidelines.map(g => `- ${g}`).join('\n')}`
         const bp = typeof p.behavior_patterns === 'string' ? p.behavior_patterns : JSON.stringify(p.behavior_patterns)
         guidelines.push(`- Behavior patterns: ${bp}`)
       }
-      if (p.name) {
-        guidelines.push(`- User name: ${p.name}`)
-      }
+      // Name intentionally omitted — see systemPersona.js for rationale (Phase 8)
     }
 
     if (guidelines.length === 1) {

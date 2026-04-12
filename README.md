@@ -5,12 +5,12 @@ An AI chat that automatically routes your prompt to the best available model acr
 
 ## 🚀 Features
 
-- **AI-Powered Routing** - Groq Compound Mini acts as a meta-router, reading your prompt and picking the best model
-- **Multi-Provider Support** - 11 active models across Mistral, Cerebras, Cohere, and Groq
-- **Smart Capability Detection** - Detects code, reasoning, and analysis needs automatically
-- **Chat Interface** - Clean chat UI with message history, typing indicators, and auto-scroll
-- **Real-time Analytics** - Dashboard with request metrics and model performance tracking
-- **Model Registry** - View all models, their capabilities, and API key status
+- **Smart Relay & Hive Mode** - Cross-model orchestration that routes prompts to specialist models or runs complex multi-model pipelines.
+- **Persistent Memory** - Automatic session summarization and long-term memory retrieval for continuous learning.
+- **Session Branching** - Effortlessly start new chats from specific topics or points in a conversation.
+- **Multi-Provider Support** - 11 active models across Mistral, Cerebras, Cohere, and Groq.
+- **Real-time Analytics** - Live dashboard with request metrics, latency tracking, and model performance.
+- **Modern Chat UI** - Premium chat interface with message selection, memory integration, and responsive design.
 
 ## 📊 Providers & Models
 
@@ -39,9 +39,8 @@ An AI chat that automatically routes your prompt to the best available model acr
 
 ```
 relay/
-├── frontend/          # React application
-├── backend/           # Express API server
-└── shared/            # Shared types/constants
+├── frontend/          # React application (Vite)
+└── backend/           # Express API server (Node.js)
 ```
 
 ## 🚦 Getting Started
@@ -58,8 +57,8 @@ relay/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/vijaykrishn55/distributed-ai-os.git
-cd distributed-ai-os
+git clone https://github.com/vijaykrishn55/Relay
+cd Relay
 ```
 
 2. **Setup Backend**
@@ -95,19 +94,20 @@ npm run dev
 
 ## 🎯 How It Works
 
-1. **User sends a message** in the Chat
-2. **Compound Mini (meta-router)** reads the prompt and selects the best available model from the registry
-3. **Request routed** to the selected model's provider
-4. **Response returned** with the model name, latency, and token count displayed
-5. **Analytics updated** — every request is tracked on the Dashboard
+1. **User sends a message** in the Chat.
+2. **Relay Engine** (powered by Compound Mini) analyzes the intent and selects the optimal model or pipeline.
+3. **Request routed** to the selected provider (Groq, Cerebras, Mistral, or Cohere).
+4. **Persistent Memory** automatically captures key insights and summarizes previous sessions for long-term context.
+5. **Analytics updated** — every request is tracked in real-time on the Dashboard.
 
 If AI-powered routing fails, it falls back to a balanced strategy based on latency and capability scores.
 
 ## 📱 Pages
 
-- **Dashboard** — System overview, request count, active models, recent request log
-- **Chat** — Clean Chat Interface, AI picks the model for each message
-- **Models** — View all registered models, capabilities, provider status, add new models
+- **Dashboard** — System overview, request count, active models, recent request log.
+- **Chat** — Clean Chat Interface with AI-powered routing, follow-ups, and session branching.
+- **Memory** — Neural search through persistent memories and summarized insights.
+- **Models** — View and manage registered models, capabilities, and provider status.
 
 ## 🔥 Key Capabilities
 

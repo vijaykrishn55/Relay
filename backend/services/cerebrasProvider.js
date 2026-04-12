@@ -7,7 +7,7 @@ class CerebrasProvider {
     })
   }
 
-  async callModel(model, input, systemContext = null) {
+  async callModel(model, input, systemContext = null, conversationHistory = []) {
     try {
       const startTime = Date.now()
 
@@ -30,6 +30,10 @@ class CerebrasProvider {
       const messages = []
       if (systemContext) {
         messages.push({ role: 'system', content: systemContext })
+      }
+      // Include conversation history for in-session context
+      if (conversationHistory && conversationHistory.length > 0) {
+        messages.push(...conversationHistory)
       }
       messages.push({ role: 'user', content: input })
 

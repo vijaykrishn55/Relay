@@ -1,5 +1,5 @@
 /**
- * Decomposer Service — Phase 6: Hive Mind (Phase 1)
+ * Decomposer Service : Hive Mind 
  * 
  * Uses 2 models in conversation to break down a user question into
  * scored sub-tasks with dependency tracking.

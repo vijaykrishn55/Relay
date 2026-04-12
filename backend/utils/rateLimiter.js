@@ -1,5 +1,5 @@
 /**
- * Rate Limiter — Phase 6: Hive Mind
+ * Rate Limiter : Hive Mind
  * 
  * Tracks per-model API usage with sliding windows for RPM and RPD.
  * Used by the Strategy phase to avoid assigning rate-limited models.

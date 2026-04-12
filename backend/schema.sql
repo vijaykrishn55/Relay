@@ -121,7 +121,7 @@ DEALLOCATE PREPARE stmt;
 -- ============================================================
 -- 8. SEED MODELS — insert the default models
 -- ============================================================
-INSERT IGNORE INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider) VALUES
+REPLACE INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider) VALUES
 (2,  'Codestral',              'Mistral',  'active', '["text-generation","code","reasoning","documentation"]',     0, 250, '{"rpm":60,"tpm":100000}',                       128000, 128000, 'https://codestral.mistral.ai', 'codestral-latest',                              'mistral'),
 (3,  'Qwen 3 32B',             'Cerebras', 'active', '["text-generation","code","reasoning"]',                     0, 180, '{"rpm":10,"tpm":60000,"rpd":100}',              128000, 128000, 'https://api.cerebras.ai',      'qwen-3-32b',                                    'cerebras'),
 (4,  'Llama 3.3 70B',          'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":64000,"rpd":14400}',            128000,  65536, 'https://api.cerebras.ai',      'llama-3.3-70b',                                 'cerebras'),
@@ -261,3 +261,50 @@ SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_orchestration_session ON orches
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 13. Phase 8: response_preferences on user_profiles
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user_profiles' AND column_name = 'response_preferences');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE user_profiles ADD COLUMN response_preferences JSON DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 14. Phase 8: USER_PATTERNS — Learned user behavior patterns
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_patterns (
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    user_id           INT NOT NULL DEFAULT 1,
+    pattern_type      ENUM('topic_engagement','response_feedback',
+                           'session_timing','query_style') NOT NULL,
+    pattern_key       VARCHAR(255) NOT NULL,
+    pattern_value     JSON NOT NULL,
+    occurrence_count  INT NOT NULL DEFAULT 1,
+    last_occurrence   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                      ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uk_user_pattern (user_id, pattern_type, pattern_key),
+    INDEX idx_pattern_type (pattern_type),
+    INDEX idx_last_occurrence (last_occurrence)
+);
+
+-- ============================================================
+-- 15. Phase 8: FEEDBACK_SIGNALS — Response quality signals
+-- ============================================================
+CREATE TABLE IF NOT EXISTS feedback_signals (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    session_id      VARCHAR(36) NOT NULL,
+    message_id      INT DEFAULT NULL,
+    signal_type     ENUM('like','dislike','correction',
+                         'clarification_request','regenerate','follow_up') NOT NULL,
+    signal_data     JSON DEFAULT NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL,
+    INDEX idx_session_signals (session_id, signal_type)
+);

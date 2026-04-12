@@ -1,5 +1,5 @@
 /**
- * Model Conversation Engine — Phase 6: Hive Mind
+ * Model Conversation Engine — : Hive Mind
  * 
  * Manages structured 2-model dialogues with turn limits,
  * convergence checking, and timeout enforcement.

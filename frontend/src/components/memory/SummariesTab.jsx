@@ -56,8 +56,8 @@ function SummariesTab({ onCountUpdate }) {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">{error}</p>
-        <button onClick={fetchSummaries} className="mt-2 text-purple-600 hover:underline">
+        <p className="text-red-400">{error}</p>
+        <button onClick={fetchSummaries} className="mt-2 text-neon-cyan hover:underline">
           Try again
         </button>
       </div>
@@ -69,20 +69,20 @@ function SummariesTab({ onCountUpdate }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800">Conversation History</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-lg font-semibold text-gray-100">Conversation History</h2>
+          <p className="text-sm text-gray-400">
             {summaries.length} session summar{summaries.length === 1 ? 'y' : 'ies'}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-[10px] font-medium">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-neon-cyan to-neon-purple text-gray-900 text-[10px] font-medium">
             <Wand2 size={10} />
             AI-Generated
           </span>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+            className="p-2 text-gray-400 hover:text-gray-300 rounded-lg hover:bg-white/10 disabled:opacity-50 transition-colors"
             title="Refresh summaries"
           >
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
@@ -92,31 +92,31 @@ function SummariesTab({ onCountUpdate }) {
 
       {/* Search bar */}
       <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
         <input
           type="text"
           placeholder="Search summaries, topics..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2.5 text-sm border border-white/10 bg-surface-low rounded-xl focus:outline-none focus:ring-2 focus:ring-neon-cyan focus:border-neon-cyan text-gray-100 placeholder-gray-500 transition-all"
         />
       </div>
 
       {/* Summaries list */}
       {summaries.length === 0 ? (
-        <div className="text-center py-16 bg-gray-50 rounded-xl">
-          <FileText size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">No session summaries yet.</p>
-          <p className="text-gray-400 text-xs mt-1">
+        <div className="text-center py-16 bg-white/5 border border-white/10 rounded-xl">
+          <FileText size={40} className="mx-auto text-gray-600 mb-3" />
+          <p className="text-gray-400 text-sm">No session summaries yet.</p>
+          <p className="text-gray-500 text-xs mt-1">
             Session summaries are automatically generated when you start a new conversation.
             <br />
             Have a chat first!
           </p>
         </div>
       ) : filteredSummaries.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl">
-          <Search size={32} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">No summaries match "{searchQuery}"</p>
+        <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
+          <Search size={32} className="mx-auto text-gray-600 mb-3" />
+          <p className="text-gray-400 text-sm">No summaries match "{searchQuery}"</p>
         </div>
       ) : (
         <div className="space-y-3">

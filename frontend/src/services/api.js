@@ -17,7 +17,8 @@ export const analyticsAPI = {
 }
 
 export const aiAPI = {
-  process: (data) => api.post('/ai/process', data)
+  process: (data) => api.post('/ai/process', data),
+  getContextInfo: (sessionId, modelId) => api.get(`/ai/context-info/${sessionId}`, { params: { modelId } })
 }
 
 export const sessionsAPI = {
@@ -30,6 +31,7 @@ export const sessionsAPI = {
     api.post('/sessions/with-context', { contextMessages, parentSessionId, topic }),
   touch: (id) => api.post(`/sessions/${id}/touch`),
 }
+
 export const memoryAPI = {
   getAll: (query)        => api.get('/memory', { params: query ? { q: query } : {} }),
   getById: (id)          => api.get(`/memory/${id}`),

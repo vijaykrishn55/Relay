@@ -4,10 +4,12 @@ React-based chat interface for AI-powered model routing.
 
 ## 🚀 Features
 
-- **Chat** — chat interface with message history, typing indicator, and auto-scroll
-- **Dashboard** — Real-time request metrics, active model count, recent request log
-- **Models** — View all registered models, capabilities, provider, and API key status
-- **Fixed Sidebar** — Persistent navigation with Dashboard, Chat, and Models
+- **Chat** — Dynamic interface with multi-model routing, message follow-ups, and session branching.
+- **Selection Mode** — Tap messages to save to persistent memory or create new context-aware sessions.
+- **Memory Dashboard** — Neural search interface for long-term insights and summarized conversation data.
+- **Dashboard** — Real-time performance metrics, model utilization, and latency tracking.
+- **Models** — Comprehensive registry of 11+ models across multiple providers with status monitoring.
+- **Sidebar Navigation** — Persistent access to Dashboard, Chat, Memory, and Model settings.
 
 ## 🛠️ Tech Stack
 
@@ -37,15 +39,17 @@ npm run build
 ```
 src/
 ├── components/
-│   ├── Layout.jsx          # Fixed sidebar + main content shell
-│   ├── AddModel.jsx        # Add new model modal
-│   ├── ModelCard.jsx       # Model display card
+│   ├── Layout.jsx          # Sidebar + main content shell
+│   ├── MessageBubble.jsx   # Interactive message with action buttons
+│   ├── RelayChip.jsx       # Relay context indicator
+│   ├── RelayTopicPicker.jsx # Session branching topic detector
+│   ├── ContextMeter.jsx    # Model context window visualization
 │   ├── MetricCard.jsx      # Dashboard metric tile
-│   ├── RequestsTable.jsx   # Recent requests table
-│   └── LoadingSpinner.jsx  # Loading state component
+│   └── LoadingSpinner.jsx  # AI pipeline progress indicator
 ├── pages/
 │   ├── Dashboard.jsx       # Analytics dashboard
-│   ├── chat.jsx            # ChatGPT-style AI chat
+│   ├── Chat.jsx            # Multi-model intelligent chat
+│   ├── Memory.jsx          # Persistent memory search
 │   └── Models.jsx          # Model registry
 ├── services/
 │   └── api.js              # Axios API client

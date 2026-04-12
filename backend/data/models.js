@@ -201,29 +201,50 @@ const staticModels = [
 
 // Cached models from DB
 let cachedModels = null
+let hasSynced = false
+
+/**
+ * Ensure all static models exist in the DB.
+ * Uses REPLACE INTO to upsert — safe to call multiple times.
+ */
+async function syncModels() {
+  if (hasSynced) return
+  try {
+    for (const m of staticModels) {
+      await query(
+        `REPLACE INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          m.id, m.name, m.provider, m.status,
+          JSON.stringify(m.capabilities), m.costPer1k, m.avgLatency,
+          JSON.stringify(m.rateLimit), m.contextWindow, m.maxOutputTokens,
+          m.endpoint, m.model_id, m.apiProvider
+        ]
+      )
+    }
+    hasSynced = true
+    console.log(`✅ Synced ${staticModels.length} models to database`)
+  } catch (err) {
+    console.warn('⚠️ Failed to sync models to DB:', err.message)
+  }
+}
 
 async function loadModels() {
   try {
     const rows = await query('SELECT * FROM models')
+    
+    // If DB has fewer models than expected, sync first
+    if (rows.length < staticModels.length && !hasSynced) {
+      await syncModels()
+      // Re-query after sync
+      const freshRows = await query('SELECT * FROM models')
+      cachedModels = freshRows.map(mapDbRow)
+      return cachedModels
+    }
+    
     if (rows.length === 0) return staticModels
 
-    cachedModels = rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      provider: r.provider,
-      status: r.status,
-      capabilities: typeof r.capabilities === 'string' ? JSON.parse(r.capabilities) : r.capabilities,
-      costPer1k: parseFloat(r.cost_per_1k),
-      avgLatency: r.avg_latency,
-      rateLimit: typeof r.rate_limit === 'string' ? JSON.parse(r.rate_limit) : r.rate_limit,
-      contextWindow: r.context_window,
-      maxOutputTokens: r.max_output_tokens,
-      endpoint: r.endpoint,
-      model_id: r.model_id,
-      apiProvider: r.api_provider,
-      scores: r.scores ? (typeof r.scores === 'string' ? JSON.parse(r.scores) : r.scores) : null,
-      roles: r.roles ? (typeof r.roles === 'string' ? JSON.parse(r.roles) : r.roles) : []
-    }))
+    cachedModels = rows.map(mapDbRow)
     return cachedModels
   } catch (error) {
     console.warn('⚠️ Failed to load models from DB, using static fallback:', error.message)
@@ -231,8 +252,28 @@ async function loadModels() {
   }
 }
 
+function mapDbRow(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    provider: r.provider,
+    status: r.status,
+    capabilities: typeof r.capabilities === 'string' ? JSON.parse(r.capabilities) : r.capabilities,
+    costPer1k: parseFloat(r.cost_per_1k),
+    avgLatency: r.avg_latency,
+    rateLimit: typeof r.rate_limit === 'string' ? JSON.parse(r.rate_limit) : r.rate_limit,
+    contextWindow: r.context_window,
+    maxOutputTokens: r.max_output_tokens,
+    endpoint: r.endpoint,
+    model_id: r.model_id,
+    apiProvider: r.api_provider,
+    scores: r.scores ? (typeof r.scores === 'string' ? JSON.parse(r.scores) : r.scores) : null,
+    roles: r.roles ? (typeof r.roles === 'string' ? JSON.parse(r.roles) : r.roles) : []
+  }
+}
+
 function getModelsSync() {
   return cachedModels || staticModels
 }
 
-module.exports = { loadModels, getModelsSync, staticModels }
+module.exports = { loadModels, getModelsSync, staticModels, syncModels }

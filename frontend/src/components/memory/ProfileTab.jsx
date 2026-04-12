@@ -91,8 +91,8 @@ function ProfileTab({ onProfileUpdate }) {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">{error}</p>
-        <button onClick={fetchProfile} className="mt-2 text-purple-600 hover:underline">
+        <p className="text-red-400">{error}</p>
+        <button onClick={fetchProfile} className="mt-2 text-neon-cyan hover:underline">
           Try again
         </button>
       </div>
@@ -104,17 +104,17 @@ function ProfileTab({ onProfileUpdate }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800">About You</h2>
-          <p className="text-sm text-gray-500">The AI builds this understanding over time</p>
+          <h2 className="text-lg font-semibold text-gray-100">About You</h2>
+          <p className="text-sm text-gray-400">The AI builds this understanding over time</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-medium">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-neon-purple to-neon-cyan text-gray-900 text-[10px] font-medium">
             <Sparkles size={10} />
             AI-Learned
           </span>
           <button
             onClick={handleClearProfile}
-            className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50"
+            className="p-2 text-gray-400 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
             title="Clear all profile data"
           >
             <Trash2 size={16} />
@@ -124,9 +124,9 @@ function ProfileTab({ onProfileUpdate }) {
 
       <div className="space-y-4">
         {/* Name Section */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-            <User size={16} className="text-gray-500" />
+        <div className="glass-card border border-white/10 rounded-xl p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-3 uppercase tracking-wider">
+            <User size={16} className="text-neon-cyan" />
             Name
           </div>
           {editingName ? (
@@ -137,7 +137,7 @@ function ProfileTab({ onProfileUpdate }) {
                 onChange={e => setNameValue(e.target.value)}
                 placeholder="Your name..."
                 autoFocus
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="flex-1 px-3 py-2 text-sm bg-surface-low border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-neon-cyan text-gray-100 placeholder-gray-500 transition-all"
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleNameSave()
                   if (e.key === 'Escape') {
@@ -146,7 +146,7 @@ function ProfileTab({ onProfileUpdate }) {
                   }
                 }}
               />
-              <button onClick={handleNameSave} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg">
+              <button onClick={handleNameSave} className="p-2 text-neon-cyan hover:bg-neon-cyan/10 rounded-lg transition-colors">
                 <Check size={16} />
               </button>
               <button
@@ -154,19 +154,19 @@ function ProfileTab({ onProfileUpdate }) {
                   setEditingName(false)
                   setNameValue(profile?.name || '')
                 }}
-                className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
+                className="p-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <span className={`text-sm ${profile?.name ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+              <span className={`text-sm ${profile?.name ? 'text-gray-200' : 'text-gray-500 italic'}`}>
                 {profile?.name || 'Not yet known'}
               </span>
               <button
                 onClick={() => setEditingName(true)}
-                className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50"
+                className="p-1.5 text-gray-400 hover:text-neon-cyan rounded-lg hover:bg-neon-cyan/10 transition-colors"
               >
                 <Edit3 size={14} />
               </button>
@@ -209,7 +209,7 @@ function ProfileTab({ onProfileUpdate }) {
 
         {/* Last Updated */}
         {profile?.updated_at && (
-          <div className="text-xs text-gray-400 text-center pt-2">
+          <div className="text-xs text-gray-500 text-center pt-2">
             Last updated: {new Date(profile.updated_at).toLocaleString()}
           </div>
         )}

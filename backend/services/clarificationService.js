@@ -1,6 +1,5 @@
 /**
- * Clarification Service — Phase 7: Conversational Intelligence
- *
+ * Clarification Service : Conversational Intelligence
  * Detects when a question is too ambiguous to answer well
  * and builds appropriate clarifying responses.
  */
@@ -107,7 +106,7 @@ class ClarificationService {
       }
     }
 
-    // Phase 1: Fast heuristic check
+    //  Fast heuristic check
     const heuristicResult = this._heuristicCheck(question)
 
     // If strongly clear or strongly ambiguous, return heuristic result
@@ -115,7 +114,7 @@ class ClarificationService {
       return heuristicResult
     }
 
-    // Phase 2: AI analysis for borderline cases
+    //  AI analysis for borderline cases
     if (this.aiProvider && this.model && heuristicResult.confidence < 0.7) {
       try {
         return await this._aiCheck(question)
@@ -126,6 +125,95 @@ class ClarificationService {
     }
 
     return heuristicResult
+  }
+
+  /**
+   * Phase 8: Context-aware clarification check.
+   * FIRST checks if the question references something in the conversation
+   * history before evaluating ambiguity. This prevents false positives
+   * on follow-up questions like "social feeds?" after a response that
+   * mentioned social feeds.
+   *
+   * @param {string}   question             - User's question
+   * @param {object[]} conversationHistory  - Recent messages [{role, content}]
+   * @param {object}   userProfile          - User profile
+   * @returns {Promise<{needsClarification: boolean, confidence: number, reason: string}>}
+   */
+  async checkWithContext(question, conversationHistory = [], userProfile = {}) {
+    if (!question || typeof question !== 'string') {
+      return this._noNeedResult('empty_input')
+    }
+
+    // Skip if user preferences disable clarifications
+    if (userProfile.engagement_preferences?.askClarifications === false) {
+      return this._noNeedResult('clarifications_disabled_by_user')
+    }
+
+    // ── Phase 8 SHORT-CIRCUIT: Check conversation context FIRST ──
+    // If the question references something from the last AI response,
+    // it's NOT ambiguous — it's a follow-up.
+    if (conversationHistory && conversationHistory.length > 0) {
+      const lastAssistantMsg = conversationHistory
+        .filter(m => m.role === 'assistant')
+        .pop()
+
+      if (lastAssistantMsg && lastAssistantMsg.content) {
+        const referenced = this._questionReferencesResponse(question, lastAssistantMsg.content)
+        if (referenced) {
+          console.log(`   → Phase 8 short-circuit: "${question}" references previous response`)
+          return {
+            needsClarification: false,
+            confidence: 0.95,
+            reason: `Follow-up referencing previous response: "${referenced}"`,
+            suggestedClarification: null,
+            method: 'context-shortcircuit'
+          }
+        }
+      }
+    }
+
+    // Fall through to standard check if no context match
+    return this.check(question, userProfile)
+  }
+
+  /**
+   * Phase 8: Check if a question references something from the previous AI response.
+   * Extracts key terms from the question and checks if they appear in the response.
+   * @private
+   */
+  _questionReferencesResponse(question, responseContent) {
+    if (!question || !responseContent) return null
+
+    const lowerQ = question.toLowerCase().replace(/[?!.,]/g, '').trim()
+    const lowerR = responseContent.toLowerCase()
+
+    // Extract meaningful words from the question (skip stop words)
+    const stopWords = new Set([
+      'what', 'about', 'the', 'a', 'an', 'is', 'are', 'was', 'were',
+      'how', 'why', 'can', 'you', 'tell', 'me', 'more', 'do', 'does',
+      'that', 'this', 'it', 'i', 'my', 'your', 'to', 'of', 'in', 'on',
+      'for', 'with', 'and', 'or', 'but', 'not', 'so', 'if'
+    ])
+
+    const questionWords = lowerQ.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w))
+
+    // Check if multi-word phrases from the question appear in the response
+    // (e.g., "social feeds" → check if "social feeds" appears in response)
+    if (questionWords.length >= 2) {
+      const phrase = questionWords.join(' ')
+      if (lowerR.includes(phrase)) {
+        return phrase
+      }
+    }
+
+    // Check individual meaningful words
+    for (const word of questionWords) {
+      if (word.length >= 4 && lowerR.includes(word)) {
+        return word
+      }
+    }
+
+    return null
   }
 
   /**

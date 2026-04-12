@@ -5,9 +5,9 @@ function LoadingSpinner({ message = 'Loading...' }) {
     <div className="p-8 flex items-center justify-center h-screen">
       <div className="text-center">
         <div className="inline-block">
-          <Loader className="animate-spin h-12 w-12 text-blue-600 mb-4" />
+          <Loader className="animate-spin h-12 w-12 text-neon-cyan mb-4 drop-shadow-[0_0_8px_rgba(0,242,255,0.4)]" />
         </div>
-        <p className="text-gray-600">{message}</p>
+        <p className="text-gray-300">{message}</p>
       </div>
     </div>
   )

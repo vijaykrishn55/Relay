@@ -1,287 +1,113 @@
-import { useState, useEffect, useRef } from "react";
-import { Send, Loader, AlertCircle, Bot, BookmarkPlus, ArrowRightCircle, ChevronDown, ChevronRight, Layers, CornerDownRight, GitBranch, MessageSquare } from "lucide-react";
-import { aiAPI, sessionsAPI, memoryAPI, relayAPI } from "../services/api";
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  Send, GitBranch, AlertCircle, Sparkles,
+  CheckSquare, X, BookmarkPlus, ArrowRightCircle,
+  ChevronDown, ChevronRight, Layers, Search
+} from 'lucide-react'
+import MessageBubble from '../components/MessageBubble'
+import RelayChip from '../components/RelayChip'
+import RelayTopicPicker from '../components/RelayTopicPicker'
+import ModelDropdown from '../components/ModelDropdown'
+import ContextMeter from '../components/ContextMeter'
 import { useChat } from '../context/ChatContext'
-import MessageBubble from "../components/MessageBubble";
-import RelayChip from "../components/RelayChip";
-
-// Clean up any mermaid error elements that may have been orphaned
-function cleanupMermaidErrors() {
-  document.querySelectorAll('[id^="dmermaid-"]').forEach(el => el.remove())
-  document.querySelectorAll('.mermaid-error').forEach(el => el.remove())
-  // Also remove any text nodes that are mermaid errors
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
-  const nodesToRemove = []
-  while (walker.nextNode()) {
-    if (walker.currentNode.textContent?.includes('Syntax error in text') ||
-        walker.currentNode.textContent?.includes('mermaid version')) {
-      nodesToRemove.push(walker.currentNode)
-    }
-  }
-  nodesToRemove.forEach(node => node.parentNode?.removeChild(node))
-}
+import { aiAPI, relayAPI, sessionsAPI, memoryAPI } from '../services/api'
 
 function Chat() {
   const {
-    input, setInput,
     messages, setMessages,
+    input, setInput,
     loading, setLoading,
     error, setError,
-    activeSessionId, setActiveSessionId,
-    bottomRef, skipLoadRef,
-    sessions, fetchSessions, createSession, loadSession, updateLocalTitle,
+    activeSessionId,
+    handleNewChat, handleSelectSession,
+    fetchSessions, loadSession,
+    bottomRef
   } = useChat()
-  const activeSessionIdRef = useRef(activeSessionId)
 
-  useEffect(() => {
-    activeSessionIdRef.current = activeSessionId
-  }, [activeSessionId])
+  const [selectedModel, setSelectedModel] = useState('')
+  const [selectedModelName, setSelectedModelName] = useState('Auto')
+  const [relayMode, setRelayMode] = useState(false)
 
-  // Cleanup mermaid errors on mount and when messages change
-  useEffect(() => {
-    cleanupMermaidErrors()
-    // Also set up a periodic cleanup
-    const interval = setInterval(cleanupMermaidErrors, 1000)
-    return () => clearInterval(interval)
-  }, [messages])
+  // ── Relay context: stores full context about the target message ──
+  // Shape: { targetIndex, targetId, originalQuestion, originalResponse }
+  const [relayContext, setRelayContext] = useState(null)
 
-  // Context-seeded session state
-  const [contextCollapsed, setContextCollapsed] = useState(false)
-  const [contextMessages, setContextMessages] = useState([])
-  const [parentSessionInfo, setParentSessionInfo] = useState(null) // { id, topic }
+  const [relayTopics, setRelayTopics] = useState([])
+  const [showTopics, setShowTopics] = useState(false)
+  const [fetchingTopics, setFetchingTopics] = useState(false)
+  const containerRef = useRef(null)
+  const textareaRef = useRef(null)
 
-  // Selection mode state
+  // ── Selection mode state ──
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIndices, setSelectedIndices] = useState(new Set())
 
-  // Relay state
-  const [relayTarget, setRelayTarget] = useState(null) // { index, message, originalQuestion }
-  const [relayTopics, setRelayTopics] = useState([])
-  const [relayTopicsLoading, setRelayTopicsLoading] = useState(false)
-  const [relayTopicsExpanded, setRelayTopicsExpanded] = useState(false)
+  // ── Context messages from parent session ──
+  const [contextMessages, setContextMessages] = useState([])
+  const [contextCollapsed, setContextCollapsed] = useState(false)
 
-  // Toggle selection mode on/off
+  // Load session messages when activeSessionId changes
+  useEffect(() => {
+    loadSession(activeSessionId)
+    if (activeSessionId) {
+      sessionsAPI.getById(activeSessionId).then(res => {
+        setContextMessages(res.data.context_messages || [])
+      }).catch(() => {})
+    } else {
+      setContextMessages([])
+    }
+    // Clear relay state when switching sessions
+    setRelayMode(false)
+    setRelayContext(null)
+    setShowTopics(false)
+  }, [activeSessionId, loadSession])
+
+  // Auto-focus input
+  useEffect(() => {
+    textareaRef.current?.focus()
+  }, [activeSessionId])
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: 'smooth'
+        })
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [messages, loading])
+
+  // Auto-resize textarea
+  const handleInputChange = (e) => {
+    setInput(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+  }
+
+  // ── Selection handlers ──
   const toggleSelectionMode = () => {
     setSelectionMode(prev => !prev)
     setSelectedIndices(new Set())
   }
 
-  // Toggle a single message selection
-  const handleToggleSelect = (index) => {
+  const handleToggleSelect = useCallback((index) => {
     setSelectedIndices(prev => {
       const next = new Set(prev)
-      if (next.has(index)) {
-        next.delete(index)
-      } else {
-        next.add(index)
-      }
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
       return next
     })
-  }
+  }, [])
 
-  // Auto-scroll to bottom whenever messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
-
-  // Load messages + context when switching sessions
-  useEffect(() => {
-    if (!activeSessionId) {
-      setContextMessages([])
-      setParentSessionInfo(null)
-      return
-    }
-    loadSession(activeSessionId)
-    // Also load context_messages and parent info for this session
-    sessionsAPI.getById(activeSessionId).then(res => {
-      setContextMessages(res.data.context_messages || [])
-      if (res.data.parent_session_id) {
-        setParentSessionInfo({
-          id: res.data.parent_session_id,
-          topic: res.data.relay_topic || null
-        })
-      } else {
-        setParentSessionInfo(null)
-      }
-    }).catch(() => {
-      setContextMessages([])
-      setParentSessionInfo(null)
-    })
-  }, [activeSessionId, loadSession])
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!input.trim()) return
-
-    const userMessage = input.trim()
-    setInput('')
-    setError('')
-
-    // ── If relay target is set, AI decides: follow-up or new session ──
-    if (relayTarget) {
-      await handleRelaySmart(userMessage)
-      return
-    }
-
-    let sessionId = activeSessionId
-    if (!sessionId) {
-      const session = await createSession()
-      sessionId = session.id
-      skipLoadRef.current = true
-      setActiveSessionId(session.id)
-      activeSessionIdRef.current = session.id
-    }
-
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
-    setLoading(true)
-    const requestSessionId = sessionId
-
-    // Optimistically update the session title from the first user message
-    const currentSession = sessions.find(s => s.id === sessionId)
-    if (currentSession && currentSession.title === 'New Chat') {
-      const autoTitle = userMessage.length > 40 ? userMessage.substring(0, 40) + '...' : userMessage
-      updateLocalTitle(sessionId, autoTitle)
-    }
-
-    try {
-      const response = await aiAPI.process({
-        input: userMessage,
-        strategy: 'ai-powered',
-        requiredCapabilities: ['text-generation'],
-        sessionId,
-      })
-
-      if (activeSessionIdRef.current !== requestSessionId) return
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: response.data.output,
-          model: response.data.model,
-        },
-      ])
-
-      fetchSessions()
-    } catch (err) {
-      console.error('Error:', err)
-      if (activeSessionIdRef.current !== requestSessionId) return
-      setError('Failed to get a response. Please try again.')
-      setMessages((prev) => prev.slice(0, -1))
-    } finally {
-      if (activeSessionIdRef.current === requestSessionId) {
-        setLoading(false)
-      }
-    }
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e)
-    }
-  }
-
-  // ── Regenerate: re-send last user message ───────────
-  const handleRegenerate = async () => {
-    const requestSessionId = activeSessionId
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-    if (!requestSessionId || !lastUserMsg || loading) return
-
-    const backupMessages = [...messages]
-
-    // Optimistic: remove last assistant message
-    setMessages((prev) => {
-      const lastAsstIdx = prev.reduce((last, m, i) => (m.role === 'assistant' ? i : last), -1)
-      if (lastAsstIdx === -1) return prev
-      return prev.filter((_, i) => i !== lastAsstIdx)
-    })
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await aiAPI.process({
-        input: lastUserMsg.content,
-        strategy: 'ai-powered',
-        requiredCapabilities: ['text-generation'],
-        sessionId: requestSessionId,
-      })
-
-      if (activeSessionIdRef.current !== requestSessionId) return
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: response.data.output,
-          model: response.data.model,
-        },
-      ])
-      fetchSessions()
-    } catch {
-      if (activeSessionIdRef.current !== requestSessionId) return
-      setMessages(backupMessages)
-      setError('Regeneration failed. Try again.')
-    } finally {
-      if (activeSessionIdRef.current === requestSessionId) {
-        setLoading(false)
-      }
-    }
-  }
-
-  // ── Edit: truncate conversation and resend ──────────
-  const handleEdit = async (messageIndex, newContent) => {
-    const requestSessionId = activeSessionId
-    if (!requestSessionId || loading) return
-
-    const backupMessages = [...messages]
-
-    // Remove all messages after the edited one, update the edited message
-    setMessages((prev) => {
-      const truncated = prev.slice(0, messageIndex)
-      return [...truncated, { ...prev[messageIndex], content: newContent }]
-    })
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await aiAPI.process({
-        input: newContent,
-        strategy: 'ai-powered',
-        requiredCapabilities: ['text-generation'],
-        sessionId: requestSessionId,
-      })
-
-      if (activeSessionIdRef.current !== requestSessionId) return
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: response.data.output,
-          model: response.data.model,
-        },
-      ])
-      fetchSessions()
-    } catch {
-      if (activeSessionIdRef.current !== requestSessionId) return
-      setMessages(backupMessages)
-      setError('Failed to get response. Try again.')
-    } finally {
-      if (activeSessionIdRef.current === requestSessionId) {
-        setLoading(false)
-      }
-    }
-  }
-
-  // ── Save selected messages to memory bank ───────────
   const handleSaveToMemory = async () => {
     const selectedMessages = Array.from(selectedIndices)
       .sort((a, b) => a - b)
-      .map(i => messages[i])
-
+      .map(i => messages[i]).filter(Boolean)
+    if (selectedMessages.length === 0) return
     try {
       for (const msg of selectedMessages) {
         await memoryAPI.create({
@@ -291,9 +117,9 @@ function Chat() {
           tags: [msg.role]
         })
       }
-
       setSelectionMode(false)
       setSelectedIndices(new Set())
+      setError('')
       alert(`${selectedMessages.length} message(s) saved to memory!`)
     } catch (err) {
       console.error('Failed to save to memory:', err)
@@ -301,33 +127,17 @@ function Chat() {
     }
   }
 
-  // ── Start a new session pre-loaded with selected messages as context ──
   const handleStartContextSession = async () => {
     const ctxMessages = Array.from(selectedIndices)
       .sort((a, b) => a - b)
-      .map(i => ({
-        role: messages[i].role,
-        content: messages[i].content,
-        model: messages[i].model || null
-      }))
-
+      .map(i => messages[i]).filter(Boolean)
+      .map(m => ({ role: m.role, content: m.content, model: m.model || null }))
+    if (ctxMessages.length === 0) return
     try {
-      // Pass current session as parent
-      const res = await sessionsAPI.createWithContext(ctxMessages, activeSessionId, null)
-      const newSession = res.data
-
-      // Skip the auto-load in ChatContext so it doesn't overwrite our state
-      skipLoadRef.current = true
-      setActiveSessionId(newSession.id)
-      setMessages([])
-      // Set context messages immediately — we already have them
-      setContextMessages(newSession.context_messages || ctxMessages)
-      setParentSessionInfo(newSession.parent_session_id ? {
-        id: newSession.parent_session_id,
-        topic: newSession.relay_topic || null
-      } : null)
+      const res = await sessionsAPI.createWithContext(ctxMessages, activeSessionId)
       setSelectionMode(false)
       setSelectedIndices(new Set())
+      handleSelectSession(res.data.id)
       fetchSessions()
     } catch (err) {
       console.error('Failed to create context session:', err)
@@ -335,234 +145,375 @@ function Chat() {
     }
   }
 
-  // ── Relay: Toggle — auto-target last assistant response + fetch topics ──
-  const handleRelayToggle = async () => {
-    if (relayTarget) {
-      // already active → cancel
-      setRelayTarget(null)
-      setRelayTopics([])
-      setRelayTopicsExpanded(false)
+  // ── Clear relay state helper ──
+  const clearRelayState = useCallback(() => {
+    setRelayMode(false)
+    setRelayContext(null)
+    setShowTopics(false)
+  }, [])
+
+  // ── Relay/Hive toggle ──
+  // Available from the very start. When no AI messages exist, it triggers Hive mode.
+  // When AI messages exist, it enters relay-from-last-response mode.
+  const handleRelayClick = useCallback(() => {
+    if (loading) {
+      setError('Please wait for response to complete')
       return
     }
 
-    // Find last assistant message
-    let lastAssistantIdx = -1
+    if (relayMode) {
+      // Already in relay — turn off
+      clearRelayState()
+      return
+    }
+
+    // Find the last AI message and its index
+    let lastAIIndex = -1
+    let lastAI = null
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'assistant') {
-        lastAssistantIdx = i
-        break
-      }
-    }
-    if (lastAssistantIdx === -1) return
-
-    const targetMsg = messages[lastAssistantIdx]
-
-    // Find the user question that preceded this response
-    let originalQuestion = ''
-    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        originalQuestion = messages[i].content
+        lastAIIndex = i
+        lastAI = messages[i]
         break
       }
     }
 
-    setRelayTarget({
-      index: lastAssistantIdx,
-      message: targetMsg,
-      originalQuestion
-    })
-    setRelayTopicsExpanded(false)
-
-    // Cancel selection mode if active
-    if (selectionMode) {
-      setSelectionMode(false)
-      setSelectedIndices(new Set())
-    }
-
-    // Fetch topics in background (only if enough messages)
-    if (activeSessionId && messages.length >= 4) {
-      setRelayTopicsLoading(true)
-      try {
-        const res = await relayAPI.getTopics(activeSessionId)
-        setRelayTopics(res.data.topics || [])
-      } catch (err) {
-        console.error('Failed to extract topics:', err)
-        // non-blocking — topics are optional suggestions
-      } finally {
-        setRelayTopicsLoading(false)
+    if (lastAI) {
+      // Find the user question that preceded this AI response
+      let originalQuestion = ''
+      for (let i = lastAIIndex - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          originalQuestion = messages[i].content
+          break
+        }
       }
+
+      // Store full relay context
+      setRelayContext({
+        targetIndex: lastAIIndex,
+        targetId: lastAI.id,
+        originalQuestion: originalQuestion || '',
+        originalResponse: lastAI.content || ''
+      })
+      setRelayMode(true)
+      setShowTopics(false)
+      if (activeSessionId) fetchTopics()
+    } else {
+      // No AI messages → enable Hive Orchestra mode
+      setRelayMode(true)
+      setRelayContext(null)
+      setShowTopics(false)
+    }
+  }, [messages, activeSessionId, setError, loading, relayMode, clearRelayState])
+
+  const fetchTopics = async () => {
+    if (!activeSessionId) return
+    try {
+      setFetchingTopics(true)
+      const res = await relayAPI.getTopics(activeSessionId)
+      setRelayTopics(res.data.topics || [])
+    } catch (err) {
+      console.error('Failed to fetch relay topics:', err)
+      setRelayTopics([])
+    } finally {
+      setFetchingTopics(false)
     }
   }
 
-  // ── Relay: Smart — AI classifies intent and auto-routes ──
-  const handleRelaySmart = async (userInput) => {
-    const { index, message, originalQuestion } = relayTarget
-    const requestSessionId = activeSessionId
+  const handleSendMessage = useCallback(async (e) => {
+    e.preventDefault()
+    if (!input.trim() || loading || !activeSessionId) return
 
-    if (!requestSessionId) return
-
-    // Save backup for rollback
-    const backupMessages = [...messages]
-
-    // Clear relay
-    setRelayTarget(null)
-    setRelayTopics([])
-    setRelayTopicsExpanded(false)
-    setLoading(true)
+    const userMessage = input.trim()
+    setInput('')
     setError('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+
+    const tempUserMsg = {
+      id: Date.now(),
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date(),
+    }
+    setMessages(prev => [...prev, tempUserMsg])
 
     try {
-      const response = await relayAPI.smart({
-        sessionId: requestSessionId,
-        targetMessageIndex: index,
-        originalQuestion,
-        originalResponse: message.content,
-        userInput
-      })
+      setLoading(true)
 
-      if (activeSessionIdRef.current !== requestSessionId) return
+      if (relayMode && relayContext) {
+        // ── RELAY MODE: Smart relay with full context ──
+        const response = await relayAPI.smart({
+          sessionId: activeSessionId,
+          userInput: userMessage,
+          targetMessageIndex: relayContext.targetIndex,
+          originalQuestion: relayContext.originalQuestion,
+          originalResponse: relayContext.originalResponse,
+        })
 
-      const { action } = response.data
+        const responseData = response.data
 
-      if (action === 'follow_up') {
-        // Update the target message IN-PLACE (no new bubble)
-        setMessages(prev => prev.map((msg, i) =>
-          i === index
-            ? { ...msg, content: response.data.output, model: response.data.model, relayUpdated: true }
-            : msg
-        ))
-      } else if (action === 'new_session') {
-        if (response.data.error === 'no_matches') {
-          setError(`No messages found about "${response.data.topic}". Try a different topic.`)
-          setMessages(backupMessages)
-          return
+        if (responseData.action === 'follow_up') {
+          // ── FOLLOW-UP: Update the target AI message in-place ──
+          // Remove the optimistic user message (follow-ups don't add new messages)
+          setMessages(prev => {
+            const updated = prev.filter(m => m.id !== tempUserMsg.id)
+            // Update the target AI message content
+            const targetIdx = relayContext.targetIndex
+            if (targetIdx >= 0 && targetIdx < updated.length) {
+              updated[targetIdx] = {
+                ...updated[targetIdx],
+                content: responseData.output,
+                model: responseData.model,
+                relayUpdated: true,
+                relayFollowUps: [
+                  ...(updated[targetIdx].relayFollowUps || []),
+                  responseData.followUpQuestion || userMessage
+                ]
+              }
+            }
+            return [...updated]
+          })
+          clearRelayState()
+
+        } else if (responseData.action === 'new_session') {
+          // ── NEW SESSION: Navigate to the branched session ──
+          // Remove the optimistic user message (this was a command, not a chat message)
+          setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id))
+          clearRelayState()
+
+          if (responseData.error === 'no_matches') {
+            setError(`No messages found matching topic: "${responseData.topic}". Try being more specific.`)
+          } else if (responseData.newSession) {
+            // Switch to the new session
+            handleSelectSession(responseData.newSession.id)
+            fetchSessions()
+          }
+        } else {
+          // Unknown action — treat as a normal response
+          const aiMessage = {
+            id: Date.now() + 1,
+            role: 'assistant',
+            content: responseData.output || 'No response generated.',
+            model: responseData.model,
+            timestamp: new Date(),
+            orchestration: responseData.orchestration || null,
+          }
+          setMessages(prev => [...prev, aiMessage])
+          clearRelayState()
         }
 
-        // Switch to the new session the backend created
-        const newSession = response.data.newSession
-        skipLoadRef.current = true
-        setActiveSessionId(newSession.id)
-        setMessages([])
-        setContextMessages(newSession.context_messages || [])
-        setParentSessionInfo(newSession.parent_session_id ? {
-          id: newSession.parent_session_id,
-          topic: newSession.relay_topic || response.data.topic || null
-        } : null)
-        fetchSessions()
+      } else {
+        // ── Normal or Hive mode (relayMode without relayContext = hive) ──
+        const response = await aiAPI.process({
+          sessionId: activeSessionId,
+          input: userMessage,
+          modelId: selectedModel || undefined,
+          mode: relayMode ? 'hive' : undefined
+        })
+
+        const aiMessage = {
+          id: response.data.messageId || Date.now() + 1,
+          role: 'assistant',
+          content: response.data.output || response.data.response || response.data.content,
+          model: response.data.model || response.data.provider,
+          timestamp: new Date(),
+          orchestration: response.data.orchestration || null,
+        }
+        setMessages(prev => [...prev, aiMessage])
+
+        if (relayMode) {
+          setRelayMode(false) // Turn off after sending
+        }
       }
 
+      // Refresh sidebar so auto-titled session name shows up
+      fetchSessions()
     } catch (err) {
-      console.error('Smart relay failed:', err)
-      if (activeSessionIdRef.current !== requestSessionId) return
-      setMessages(backupMessages)
-      setError('Relay failed. Try again.')
+      console.error('Send message error:', err)
+      setError(err.response?.data?.error || 'Failed to send message')
+      setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id))
     } finally {
-      if (activeSessionIdRef.current === requestSessionId) {
-        setLoading(false)
-      }
+      setLoading(false)
+      textareaRef.current?.focus()
+    }
+  }, [input, loading, activeSessionId, selectedModel, relayMode, relayContext, setInput, setMessages, setLoading, setError, fetchSessions, handleSelectSession, clearRelayState])
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage(e)
     }
   }
 
-  // ── Relay: Branch into a new session with topic context ──
-  const handleRelayTopicSelect = async (topic) => {
-    const contextMsgs = topic.messageIndices
-      .sort((a, b) => a - b)
-      .filter(i => i >= 0 && i < messages.length)
-      .map(i => ({
-        role: messages[i].role,
-        content: messages[i].content,
-        model: messages[i].model || null
-      }))
-
-    if (contextMsgs.length === 0) {
-      setError('No valid messages for this topic.')
-      return
+  const handleEditMessage = useCallback(async (messageId, newContent) => {
+    try {
+      setError('')
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, content: newContent, editing: false } : m
+      ))
+    } catch {
+      setError('Failed to update message')
     }
+  }, [setMessages, setError])
+
+  // ── Topic picker handlers ──
+  const handleRelayTopic = useCallback(async (topic) => {
+    // Topic selected from the picker — create a new session based on this topic
+    if (!activeSessionId) return
 
     try {
-      // Pass current session as parent and topic name
-      const res = await sessionsAPI.createWithContext(contextMsgs, activeSessionId, topic.name)
-      const newSession = res.data
+      setLoading(true)
+      setError('')
 
-      skipLoadRef.current = true
-      setActiveSessionId(newSession.id)
-      setMessages([])
-      setContextMessages(newSession.context_messages || contextMsgs)
-      setParentSessionInfo(newSession.parent_session_id ? {
-        id: newSession.parent_session_id,
-        topic: newSession.relay_topic || topic.name
-      } : null)
-      setRelayTarget(null)
-      setRelayTopics([])
-      setRelayTopicsExpanded(false)
-      fetchSessions()
+      // Call relay-smart with the topic description as user input
+      // The AI classifier will detect this as new_session intent
+      const response = await relayAPI.smart({
+        sessionId: activeSessionId,
+        userInput: `start new session about ${topic.name}`,
+        targetMessageIndex: relayContext?.targetIndex,
+        originalQuestion: relayContext?.originalQuestion,
+        originalResponse: relayContext?.originalResponse,
+      })
+
+      const responseData = response.data
+
+      if (responseData.action === 'new_session' && responseData.newSession) {
+        clearRelayState()
+        handleSelectSession(responseData.newSession.id)
+        fetchSessions()
+      } else if (responseData.action === 'new_session' && responseData.error === 'no_matches') {
+        setError(`No messages found matching topic: "${responseData.topic}". Try describing it differently.`)
+      } else {
+        // Fallback: classifier didn't pick it up as new_session, show response
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          role: 'assistant',
+          content: responseData.output || 'Topic session could not be created.',
+          model: responseData.model,
+          timestamp: new Date(),
+          orchestration: responseData.orchestration || null,
+        }])
+        clearRelayState()
+      }
     } catch (err) {
-      console.error('Failed to create topic session:', err)
-      setError('Failed to create new session from topic.')
+      console.error('Relay topic error:', err)
+      setError('Failed to create topic session')
+    } finally {
+      setLoading(false)
     }
+  }, [activeSessionId, relayContext, setMessages, setLoading, setError, fetchSessions, handleSelectSession, clearRelayState])
+
+  const handleManualTopicStart = useCallback(async (description) => {
+    // Manual topic: user typed their own description
+    await handleRelayTopic({ name: description })
+  }, [handleRelayTopic])
+
+  const handleRegenerateMessage = useCallback(async (messageId) => {
+    const msgIndex = messages.findIndex(m => m.id === messageId)
+    if (msgIndex === -1) return
+    try {
+      setLoading(true)
+      setError('')
+      let userMsg = null
+      for (let i = msgIndex - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') { userMsg = messages[i]; break }
+      }
+      if (!userMsg) throw new Error('Could not find original user message')
+      const response = await aiAPI.process({
+        sessionId: activeSessionId,
+        input: userMsg.content,
+        modelId: selectedModel || undefined,
+        regenerate: true
+      })
+      setMessages(prev => {
+        const updated = [...prev]
+        updated[msgIndex] = {
+          ...updated[msgIndex],
+          content: response.data.output || response.data.response || response.data.content,
+          model: response.data.model || response.data.provider,
+          timestamp: new Date()
+        }
+        return updated
+      })
+    } catch (err) {
+      console.error('Regenerate error:', err)
+      setError('Failed to regenerate response')
+    } finally {
+      setLoading(false)
+    }
+  }, [messages, activeSessionId, selectedModel, setMessages, setLoading, setError])
+
+  // ── No active session — welcome screen ──
+  if (!activeSessionId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="text-center space-y-5 animate-fade-in max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-neon-cyan/20 to-neon-purple/20 border border-white/10 flex items-center justify-center mx-auto">
+            <Sparkles size={28} className="text-neon-cyan" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-100">Welcome to Relay</h1>
+            <p className="text-gray-400 mt-2 text-sm">Multi-model chat with intelligent routing</p>
+          </div>
+          <button
+            onClick={handleNewChat}
+            className="px-6 py-2.5 bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/25 rounded-xl hover:bg-neon-cyan/20 transition-all text-sm font-medium"
+          >
+            Start New Chat
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Selection header ── */}
+      {selectionMode && (
+        <div className="flex-shrink-0 border-b border-white/5 bg-surface-low/90 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-3">
+            <CheckSquare size={16} className="text-neon-cyan" />
+            <span className="text-sm text-gray-200 font-medium">
+              {selectedIndices.size === 0
+                ? 'Tap messages to select'
+                : `${selectedIndices.size} message${selectedIndices.size !== 1 ? 's' : ''} selected`
+              }
+            </span>
+          </div>
+          <button
+            onClick={toggleSelectionMode}
+            className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <X size={13} /> Cancel
+          </button>
+        </div>
+      )}
 
-      {/* Chat header with selection toggle */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
-        <h2 className="text-sm font-medium text-gray-600">
-          {selectionMode
-            ? `${selectedIndices.size} message${selectedIndices.size !== 1 ? 's' : ''} selected`
-            : 'Chat'
-          }
-        </h2>
-        <button
-          onClick={toggleSelectionMode}
-          className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-            selectionMode
-              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          {selectionMode ? 'Cancel' : 'Select'}
-        </button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-6">
-
-          {messages.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center h-full pt-24 text-center">
-              <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-                <Bot size={28} className="text-blue-600" />
-              </div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">Relay</h2>
-              <p className="text-gray-500 text-sm max-w-sm">
-                AI-powered routing picks the best model for every message automatically.
-              </p>
-            </div>
-          )}
-
+      {/* ── Messages ── */}
+      <div ref={containerRef} className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-6 space-y-1">
           {/* Context messages from parent session */}
-          {contextMessages && contextMessages.length > 0 && (
-            <div className="mb-6 border border-purple-200 rounded-xl overflow-hidden bg-purple-50/50">
+          {contextMessages.length > 0 && (
+            <div className="mb-6 rounded-xl overflow-hidden border border-neon-purple/20 bg-neon-purple/5">
               <button
                 onClick={() => setContextCollapsed(!contextCollapsed)}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-purple-700 hover:bg-purple-100/50 transition-colors"
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-neon-purple hover:bg-neon-purple/10 transition-colors"
               >
-                <Layers size={14} />
-                {parentSessionInfo?.topic
-                  ? `Context: "${parentSessionInfo.topic}" from previous session`
-                  : `Context from previous session (${contextMessages.length} messages)`}
-                {contextCollapsed ? <ChevronRight size={14} className="ml-auto" /> : <ChevronDown size={14} className="ml-auto" />}
+                <Layers size={13} />
+                Context from previous session ({contextMessages.length} messages)
+                {contextCollapsed
+                  ? <ChevronRight size={13} className="ml-auto" />
+                  : <ChevronDown size={13} className="ml-auto" />
+                }
               </button>
-
               {!contextCollapsed && (
-                <div className="px-4 pb-3 space-y-2">
+                <div className="px-4 pb-3 space-y-2 border-t border-neon-purple/10">
                   {contextMessages.map((msg, i) => (
-                    <div key={i} className="text-xs text-purple-800 bg-white/60 rounded-lg px-3 py-2 border border-purple-100">
-                      <span className="font-semibold text-purple-600 uppercase text-[10px] tracking-wider">
-                        {msg.role}
-                      </span>
-                      <p className="mt-0.5 whitespace-pre-wrap">{msg.content}</p>
+                    <div key={i} className="flex gap-2 py-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 w-12 flex-shrink-0 ${
+                        msg.role === 'user' ? 'text-neon-cyan' : 'text-neon-purple'
+                      }`}>{msg.role}</span>
+                      <p className="text-xs text-gray-400 leading-relaxed line-clamp-3">{msg.content}</p>
                     </div>
                   ))}
                 </div>
@@ -570,187 +521,223 @@ function Chat() {
             </div>
           )}
 
-          {messages.map((msg, index) => {
-            const lastAssistantIndex = messages.reduce(
-              (last, m, i) => (m.role === 'assistant' ? i : last), -1
-            )
-            return (
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4 animate-fade-in">
+              <div className="w-12 h-12 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
+                <Sparkles size={22} className="text-neon-cyan/70" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-200">Start a conversation</h2>
+                <p className="text-gray-500 text-sm mt-1 max-w-sm">
+                  Ask anything. Relay will route your question to the best available model.
+                </p>
+              </div>
+            </div>
+          ) : (
+            messages.map((message, index) => (
               <MessageBubble
-                key={`${msg.timestamp || 'msg'}-${index}`}
-                message={msg}
+                key={message.id}
+                message={message}
                 index={index}
                 isLast={index === messages.length - 1}
-                isLastAssistant={index === lastAssistantIndex}
-                onRegenerate={handleRegenerate}
-                onEdit={(newContent) => handleEdit(index, newContent)}
+                isLastAssistant={message.role === 'assistant' && index === messages.length - 1}
+                onRegenerate={() => handleRegenerateMessage(message.id)}
+                onEdit={(content) => handleEditMessage(message.id, content)}
                 selectionMode={selectionMode}
                 isSelected={selectedIndices.has(index)}
                 onToggleSelect={handleToggleSelect}
               />
-            )
-          })}
+            ))
+          )}
 
           {loading && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
-                <Bot size={16} className="text-white" />
+            <div className="flex items-center gap-3 py-4 animate-fade-in">
+              <div className="w-7 h-7 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
+                <GitBranch size={13} className="text-neon-cyan" />
               </div>
-              <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                <div className="flex gap-1 items-center h-5">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
+              <div className="flex gap-1.5 items-center">
+                <div className="typing-dot" />
+                <div className="typing-dot" />
+                <div className="typing-dot" />
               </div>
             </div>
           )}
-
           <div ref={bottomRef} />
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="max-w-3xl mx-auto w-full px-4 pb-2">
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-            <span className="text-red-600 text-sm">{error}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Selection action bar — shown when messages are selected */}
+      {/* ── Selection Action Bar ── */}
       {selectionMode && selectedIndices.size > 0 && (
-        <div className="border-t border-gray-200 bg-white px-4 py-3">
+        <div className="flex-shrink-0 border-t border-white/5 bg-surface-low/95 backdrop-blur-xl px-4 py-3 animate-fade-in">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-400">
               {selectedIndices.size} message{selectedIndices.size !== 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-2">
-              <button
-                onClick={handleSaveToMemory}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
-              >
-                <BookmarkPlus size={14} />
-                Save to Memory
+              <button onClick={handleSaveToMemory}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-neon-purple/10 text-neon-purple border border-neon-purple/20 rounded-xl hover:bg-neon-purple/20 transition-colors">
+                <BookmarkPlus size={14} /> Save to Memory
               </button>
-              <button
-                onClick={handleStartContextSession}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <ArrowRightCircle size={14} />
-                New Chat with Context
+              <button onClick={handleStartContextSession}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/25 rounded-xl hover:bg-neon-cyan/25 transition-colors">
+                <ArrowRightCircle size={14} /> New Chat with Context
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Input bar */}
-      <div className="border-t border-gray-200 bg-white px-4 py-4">
-        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
-          {/* Relay chip — shows when a target is selected */}
-          <RelayChip
-            targetMessage={relayTarget?.message}
-            onClear={() => {
-              setRelayTarget(null)
-              setRelayTopics([])
-              setRelayTopicsExpanded(false)
-            }}
-          />
-
-          {/* Suggested topics drop-up — collapsible, shown when relay is active */}
-          {relayTarget && (relayTopics.length > 0 || relayTopicsLoading) && (
-            <div className="mb-2">
-              <button
-                type="button"
-                onClick={() => setRelayTopicsExpanded(!relayTopicsExpanded)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-              >
-                <GitBranch size={12} />
-                {relayTopicsLoading ? 'Finding topics...' : `${relayTopics.length} suggested topic${relayTopics.length !== 1 ? 's' : ''} to branch`}
-                {relayTopicsExpanded ? <ChevronDown size={12} className="ml-auto" /> : <ChevronRight size={12} className="ml-auto" />}
-              </button>
-
-              {relayTopicsExpanded && !relayTopicsLoading && (
-                <div className="px-1 pb-2 space-y-1.5">
-                  {relayTopics.map((topic, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleRelayTopicSelect(topic)}
-                      className="w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-800">{topic.name}</span>
-                        <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                          <MessageSquare size={9} />
-                          {topic.messageIndices.length}
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{topic.description}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-end gap-3 bg-gray-100 rounded-2xl px-4 py-3">
-            {/* Single Relay button */}
-            {messages.some(m => m.role === 'assistant') && (
-              <button
-                type="button"
-                onClick={handleRelayToggle}
-                className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
-                  relayTarget
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
-                    : 'bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600'
-                }`}
-                title={relayTarget ? 'Cancel relay' : 'Relay: follow up on last response'}
-              >
-                <CornerDownRight size={16} />
-              </button>
+      {/* ── Input Area — Claude-style: textarea on top, controls below ── */}
+      {!selectionMode && (
+        <div className="flex-shrink-0 border-t border-white/5 bg-obsidian/90 backdrop-blur-xl">
+          <div className="max-w-3xl mx-auto px-4 py-3">
+            {/* Error */}
+            {error && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/8 border border-red-500/20 animate-fade-in mb-2">
+                <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={15} />
+                <p className="text-xs text-red-300">{error}</p>
+              </div>
             )}
 
-            <textarea
-              rows={1}
-              className="flex-1 bg-transparent resize-none text-sm text-gray-800 placeholder-gray-400 focus:outline-none max-h-40"
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = e.target.scrollHeight + 'px'
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={relayTarget ? 'Ask a follow-up about this response...' : 'Message Relay...'}
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
-                relayTarget
-                  ? 'bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300'
-                  : 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300'
-              } disabled:cursor-not-allowed`}
-            >
-              {loading
-                ? <Loader size={15} className="text-white animate-spin" />
-                : <Send size={15} className="text-white" />
-              }
-            </button>
+            {/* Relay Chip */}
+            {relayMode && relayContext && (
+              <div className="mb-2">
+                <RelayChip
+                  relayContext={relayContext}
+                  onClear={clearRelayState}
+                />
+              </div>
+            )}
+
+            {/* Topics Picker */}
+            {relayMode && showTopics && (
+              <div className="mb-2">
+                <RelayTopicPicker
+                  topics={relayTopics}
+                  loading={fetchingTopics}
+                  onSelect={handleRelayTopic}
+                  onManualStart={handleManualTopicStart}
+                  onCancel={() => setShowTopics(false)}
+                />
+              </div>
+            )}
+
+            {/* ── Main input container ── */}
+            <form onSubmit={handleSendMessage}>
+              <div className="rounded-2xl border border-white/8 bg-surface-low/80 shadow-[0_-4px_30px_rgba(0,0,0,0.3)] focus-within:border-white/15 transition-colors relative z-20">
+                {/* Top section: textarea (full width) */}
+                <div className="px-4 pt-3 pb-1">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder={relayMode && relayContext
+                      ? "Type a follow-up to refine, or say 'start new session about [topic]'..."
+                      : "Ask anything..."
+                    }
+                    rows={1}
+                    className="w-full bg-transparent resize-none text-sm text-gray-100 placeholder-gray-500/60 focus:outline-none disabled:opacity-50 max-h-[200px]"
+                    disabled={loading}
+                    style={{ height: 'auto' }}
+                  />
+                </div>
+
+                {/* Bottom section: controls row */}
+                <div className="flex items-center justify-between px-3 py-2">
+                  {/* Left: model selector */}
+                  <div className="w-40">
+                    <ModelDropdown
+                      value={selectedModel}
+                      onChange={(val, name) => { setSelectedModel(val); setSelectedModelName(name || 'Auto') }}
+                      disabled={loading}
+                      compact
+                    />
+                  </div>
+
+                  {/* Right: action buttons */}
+                  <div className="flex items-center gap-1">
+                    {/* Context Meter */}
+                    <ContextMeter messages={messages} modelName={selectedModelName} relayMode={relayMode} />
+
+                    {/* Selection mode toggle */}
+                    {messages.length > 0 && (
+                      <button type="button" onClick={toggleSelectionMode}
+                        className="p-2 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all"
+                        title="Select messages">
+                        <CheckSquare size={16} />
+                      </button>
+                    )}
+
+                    {/* Browse Topics button — only in relay mode with context */}
+                    {relayMode && relayContext && messages.length >= 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowTopics(prev => !prev)}
+                        disabled={loading}
+                        className={`p-2 rounded-xl transition-all ${
+                          showTopics
+                            ? 'bg-neon-purple/20 text-neon-purple border border-neon-purple/30'
+                            : 'text-gray-500 hover:text-neon-purple hover:bg-neon-purple/10'
+                        } disabled:opacity-40`}
+                        title="Browse topics to branch into a new session"
+                      >
+                        <Search size={16} />
+                      </button>
+                    )}
+
+                    {/* Relay / Hive toggle — ALWAYS available */}
+                    <button
+                      type="button"
+                      onClick={handleRelayClick}
+                      disabled={loading}
+                      className={`p-2 rounded-xl transition-all ${
+                        relayMode
+                          ? 'bg-neon-purple/20 text-neon-purple border border-neon-purple/30'
+                          : 'text-gray-500 hover:text-neon-purple hover:bg-neon-purple/10'
+                      } disabled:opacity-40`}
+                      title={relayMode
+                        ? (relayContext ? 'Relay mode (ON) — click to cancel' : 'Hive Orchestra (ON) — click to cancel')
+                        : (messages.some(m => m.role === 'assistant')
+                          ? 'Relay — route through multiple models'
+                          : 'Hive Orchestra — multi-model from start'
+                        )
+                      }
+                    >
+                      <GitBranch size={16} />
+                    </button>
+
+                    {/* Send */}
+                    <button
+                      type="submit"
+                      disabled={loading || !input.trim()}
+                      className="p-2 rounded-xl bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/20 hover:bg-neon-cyan/25 disabled:opacity-30 disabled:border-white/5 disabled:text-gray-600 disabled:bg-transparent transition-all"
+                      title="Send (Enter)"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Relay mode indicator below the input */}
+              {relayMode && (
+                <div className="flex items-center gap-2 mt-1.5 px-1 animate-fade-in">
+                  <div className="w-1.5 h-1.5 rounded-full bg-neon-purple animate-pulse" />
+                  <span className="text-[11px] text-neon-purple/80">
+                    {relayContext
+                      ? 'Relay mode — type a follow-up or request a new session from this response'
+                      : 'Hive Orchestra — multi-model pipeline active'
+                    }
+                  </span>
+                </div>
+              )}
+            </form>
           </div>
-          <p className="text-center text-xs text-gray-400 mt-2">
-            {relayTarget
-              ? 'Relay mode: your message will refine the selected response'
-              : 'AI router picks the best model for each message automatically'
-            }
-          </p>
-        </form>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-export default Chat;
+export default Chat

@@ -82,15 +82,15 @@ function Memory() {
   }
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="max-w-4xl mx-auto px-6 py-8">
-      {/* Page Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-          <Brain size={20} className="text-purple-600" />
+        <div className="w-10 h-10 rounded-xl bg-neon-purple/20 flex items-center justify-center border border-neon-purple/30">
+          <Brain size={20} className="text-neon-purple" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">AI Memory</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-semibold text-gray-100">AI Memory</h1>
+          <p className="text-sm text-gray-400">
             What the AI knows and remembers about you
           </p>
         </div>
@@ -113,6 +113,7 @@ function Memory() {
       <div>
         {renderTabContent()}
       </div>
+    </div>
     </div>
   )
 }

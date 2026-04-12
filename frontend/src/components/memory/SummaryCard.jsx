@@ -22,45 +22,45 @@ function SummaryCard({ summary }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+    <div className="glass-card border border-white/10 rounded-xl p-4 hover:border-white/20 transition-all">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center mt-0.5">
-            <MessageSquare size={16} className="text-blue-500" />
+          <div className="w-8 h-8 rounded-lg bg-neon-cyan/10 flex items-center justify-center mt-0.5 border border-neon-cyan/20">
+            <MessageSquare size={16} className="text-neon-cyan" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-800">
+            <h3 className="text-sm font-medium text-gray-100">
               {summary.session_title || 'Conversation'}
             </h3>
-            <span className="text-xs text-gray-400">{formatDate(summary.created_at)}</span>
+            <span className="text-xs text-gray-500">{formatDate(summary.created_at)}</span>
           </div>
         </div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="p-1 text-gray-400 hover:text-gray-600 rounded"
+          className="p-1 text-gray-500 hover:text-gray-300 rounded transition-colors"
         >
           {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       </div>
 
       {/* Summary text */}
-      <p className={`text-sm text-gray-600 mt-3 leading-relaxed ${!expanded ? 'line-clamp-2' : ''}`}>
+      <p className={`text-sm text-gray-300 mt-3 leading-relaxed ${!expanded ? 'line-clamp-2' : ''}`}>
         {summary.summary}
       </p>
 
       {/* Expanded content */}
       {expanded && (
-        <div className="mt-4 space-y-3 pt-3 border-t border-gray-100">
+        <div className="mt-4 space-y-3 pt-3 border-t border-white/5">
           {/* Topics */}
           {summary.topics && summary.topics.length > 0 && (
             <div>
-              <span className="text-xs font-medium text-gray-500">Topics:</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Topics:</span>
               <div className="flex flex-wrap gap-1 mt-1">
                 {summary.topics.map((topic, idx) => (
                   <span
                     key={idx}
-                    className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium"
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20 font-medium"
                   >
                     {topic}
                   </span>
@@ -72,11 +72,11 @@ function SummaryCard({ summary }) {
           {/* Outcomes */}
           {summary.outcomes && summary.outcomes.length > 0 && (
             <div>
-              <span className="text-xs font-medium text-gray-500">Key outcomes:</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Key outcomes:</span>
               <ul className="mt-1 space-y-1">
                 {summary.outcomes.map((outcome, idx) => (
-                  <li key={idx} className="text-xs text-gray-600 flex items-start gap-1">
-                    <span className="text-gray-400">•</span>
+                  <li key={idx} className="text-xs text-gray-400 flex items-start gap-1">
+                    <span className="text-gray-600">•</span>
                     {outcome}
                   </li>
                 ))}
@@ -87,19 +87,19 @@ function SummaryCard({ summary }) {
           {/* User info extracted */}
           {summary.user_info_extracted && Object.keys(summary.user_info_extracted).length > 0 && (
             <div>
-              <span className="text-xs font-medium text-gray-500">Learned about you:</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Learned about you:</span>
               <ul className="mt-1 space-y-1">
                 {summary.user_info_extracted.name && (
-                  <li className="text-xs text-gray-600">• Name: {summary.user_info_extracted.name}</li>
+                  <li className="text-xs text-gray-400">• Name: {summary.user_info_extracted.name}</li>
                 )}
                 {summary.user_info_extracted.interests?.map((interest, idx) => (
-                  <li key={`interest-${idx}`} className="text-xs text-gray-600">• Interest: {interest}</li>
+                  <li key={`interest-${idx}`} className="text-xs text-gray-400">• Interest: {interest}</li>
                 ))}
                 {summary.user_info_extracted.preferences?.map((pref, idx) => (
-                  <li key={`pref-${idx}`} className="text-xs text-gray-600">• Preference: {pref}</li>
+                  <li key={`pref-${idx}`} className="text-xs text-gray-400">• Preference: {pref}</li>
                 ))}
                 {summary.user_info_extracted.personal_facts?.map((fact, idx) => (
-                  <li key={`fact-${idx}`} className="text-xs text-gray-600">• Fact: {fact}</li>
+                  <li key={`fact-${idx}`} className="text-xs text-gray-400">• Fact: {fact}</li>
                 ))}
               </ul>
             </div>
@@ -108,10 +108,10 @@ function SummaryCard({ summary }) {
       )}
 
       {/* Footer */}
-      <div className="flex justify-end mt-3 pt-3 border-t border-gray-100">
+      <div className="flex justify-end mt-3 pt-3 border-t border-white/5">
         <button
           onClick={handleViewChat}
-          className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-medium"
+          className="flex items-center gap-1 text-xs text-neon-cyan hover:text-neon-cyan/80 font-medium transition-colors"
         >
           View Chat
           <ExternalLink size={12} />

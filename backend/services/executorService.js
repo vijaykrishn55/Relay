@@ -1,5 +1,5 @@
 /**
- * Executor Service — Phase 6: Hive Mind (Phase 3)
+ * Executor Service : Hive Mind 
  * 
  * Executes sub-tasks on specialist models in parallel (respecting dependencies).
  * Handles retries, fallbacks, and rate-limit-aware model switching.
@@ -21,8 +21,8 @@ class ExecutorService {
   /**
    * Execute all sub-tasks according to the strategy, respecting dependencies.
    * 
-   * @param {Array}  strategies    - Phase 2 output (model + prompt per sub-task)
-   * @param {object} decomposition - Phase 1 output (sub-task definitions)
+   * @param {Array}  strategies    -  output (model + prompt per sub-task)
+   * @param {object} decomposition -  output (sub-task definitions)
    * @param {string} systemContext - Combined system context for all calls
    * @returns {{ results: object, modelsUsed: string[], totalLatency: number, failedSubtasks: string[] }}
    */

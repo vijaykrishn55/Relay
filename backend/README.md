@@ -18,10 +18,15 @@ Express.js backend API for AI-powered model routing across multiple providers.
 ```
 backend/
 ├── routes/
-│   ├── ai.js               # AI request processing
+│   ├── ai.js               # AI request processing & Hive Orchestrator
 │   ├── models.js           # Model management & API key validation
-│   └── analytics.js        # Request metrics & dashboard data
+│   ├── analytics.js        # Request metrics & dashboard data
+│   ├── sessions.js         # Chat session lifecycle & context persistence
+│   ├── memory.js           # Neural search & memory retrieval
+│   └── profile.js          # System configuration & health
 ├── services/
+│   ├── hiveOrchestrator.js # Multi-model pipeline orchestration
+│   ├── persistentMemoryService.js # Continuous learning & summarization
 │   ├── router.js           # Routing logic (ai-powered + fallback strategies)
 │   ├── aiRouterService.js  # AI meta-router using Compound Mini
 │   ├── mistralProvider.js  # Mistral integration
@@ -31,7 +36,7 @@ backend/
 ├── data/
 │   └── models.js           # Model registry (9 active + 2 Cohere)
 ├── server.js               # Express server setup
-└── .env                    # API keys (not in git)
+└── .env                    # API keys 
 ```
 
 ## 🚀 Getting Started
@@ -68,16 +73,31 @@ npm start
 
 ## 🔌 API Endpoints
 
-### Models
-```
-GET    /api/models           # Get all models
-GET    /api/models/:id       # Get model by ID
-POST   /api/models           # Add new model
-```
-
 ### AI Processing
 ```
-POST   /api/ai/process       # Process AI request
+POST   /api/ai/process       # Standard model routing
+POST   /api/relay/smart      # Intelligent relay & context branching
+```
+
+### Sessions
+```
+GET    /api/sessions         # List all sessions (titles only)
+GET    /api/sessions/:id     # Get session with full history
+POST   /api/sessions         # Start new session
+POST   /api/sessions/with-context # Branch session with existing messages
+DELETE /api/sessions/:id     # Delete session
+```
+
+### Persistent Memory
+```
+GET    /api/memory           # Search/list persistent memories
+POST   /api/memory           # Create manual memory entry
+DELETE /api/memory/:id       # Delete memory entry
+```
+
+### Profile & System
+```
+GET    /api/profile          # System status & session counts
 ```
 
 **Request Body:**
@@ -118,22 +138,13 @@ GET    /api/analytics/dashboard    # Get dashboard metrics
 ## 🎯 Routing Strategies
 
 ### AI-Powered (Default)
-- Compound Mini reads the user's prompt and selects the best model from the registry
-- Returns a model ID and reasoning string
-- Falls back to `balanced` if AI routing fails
+- Compound Mini reads the user's prompt and selects the best model from the registry.
+- Returns a model ID and reasoning string.
+- Falls back to `balanced` if AI routing fails.
 
-### Balanced
-- 60% weight on speed (avgLatency), 40% on capability quality score
-- Good general-purpose fallback
-
-### Performance
-- Picks lowest latency model — usually Groq models (~100ms)
-
-### Quality
-- Prioritizes capability score: reasoning > analysis > code > text-generation
-
-### Cost
-- Fastest model (all models are currently free-tier)
+### Hive Orchestra
+- Activated for complex tasks or via manual toggle.
+- Coordinates multiple models (Decomposer, Strategist, Specialist, Assembler) to provide deeper reasoning.
 
 ## 🔧 AI Provider Services
 
@@ -159,16 +170,21 @@ GET    /api/analytics/dashboard    # Get dashboard metrics
 11 active models in `data/models.js`. Each entry:
 ```js
 {
-  id: 9,
-  name: 'Compound Mini',
-  provider: 'Groq',
+  id: 2,
+  name: 'Codestral',
+  provider: 'Mistral',
   status: 'active',
-  capabilities: ['text-generation', 'reasoning'],
+  capabilities: ['text-generation', 'code', 'reasoning', 'documentation'],
   costPer1k: 0.0,
-  avgLatency: 100,
-  rateLimit: { rpm: 30, rpd: 14400, tpm: 70000 },
-  model_id: 'compound-beta-mini',
-  apiProvider: 'groq'
+  avgLatency: 250,
+  rateLimit: { rpm: 60, tpm: 100000 },
+  contextWindow: 128000,
+  maxOutputTokens: 128000,
+  endpoint: 'https://codestral.mistral.ai',
+  model_id: 'codestral-latest',
+  apiProvider: 'mistral',
+  scores: { reasoning: 0.7, code: 0.95, creativity: 0.4, speed: 0.6, multilingual: 0.5, analysis: 0.6, instruction: 0.8, knowledge: 0.6 },
+  roles: ['specialist']
 }
 ```
 
@@ -178,20 +194,3 @@ GET    /api/analytics/dashboard    # Get dashboard metrics
 - CORS configured for frontend origin
 - Input validation on all endpoints
 - Error handling with appropriate status codes
-
-## 📈 Rate Limits
-
-- **Groq**: 30 RPM per model
-- **Cerebras**: 10-30 RPM, up to 14,400/day
-- **Mistral**: 60 RPM
-
-## 🚀 Deployment
-
-Ready for deployment to:
-- Railway
-- Render
-- Heroku
-- AWS/GCP/Azure
-
-Environment variables must be set on hosting platform.
-

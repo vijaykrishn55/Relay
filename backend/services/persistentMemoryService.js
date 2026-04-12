@@ -10,13 +10,13 @@ const {
 
 /**
  * PersistentMemoryService
- * Enhanced in Phase 7: Conversational Intelligence
+ * Enhanced in : Conversational Intelligence
  *
  * This service handles:
  * 1. Session Summarization - When a session ends, summarize it comprehensively
  * 2. User Profile Extraction - Extract user info from session and merge into profile
  * 3. Context Building - Combine profile + last session summary for new chats
- * 4. Phase 7 Extraction - communication_style, expertise_levels, engagement_preferences
+ * 4. Extraction - communication_style, expertise_levels, engagement_preferences
  */
 class PersistentMemoryService {
   constructor(aiProvider, summarizerModel) {
@@ -26,7 +26,7 @@ class PersistentMemoryService {
 
   /**
    * Summarize a completed session and extract user information.
-   * Enhanced with Phase 7 fields: communication_style, expertise_levels.
+   * Enhanced with fields: communication_style, expertise_levels.
    * Called when a new session is created (to summarize the previous one).
    *
    * @param {string} sessionId - The session ID to summarize
@@ -57,7 +57,7 @@ class PersistentMemoryService {
         .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
         .join('\n\n')
 
-      // Enhanced summarization prompt with Phase 7 fields
+      // Enhanced summarization prompt with  fields
       const summarizationPrompt = `Analyze this conversation and create a structured summary. Return ONLY valid JSON, no markdown.
 
 CONVERSATION:
@@ -139,7 +139,7 @@ Guidelines:
       if (parsed.user_info && Object.keys(parsed.user_info).length > 0) {
         try {
           await this._mergeEnhancedUserInfo(parsed.user_info)
-          console.log(`👤 Updated user profile with extracted info (Phase 7 enhanced)`)
+          console.log(`👤 Updated user profile with extracted info`)
         } catch (profileError) {
           console.error(`⚠️ Failed to merge user info:`, profileError.message)
         }
@@ -154,7 +154,6 @@ Guidelines:
   }
 
   /**
-   * Enhanced merge function for Phase 7 fields.
    * Handles communication_style and expertise_levels separately.
    * @private
    */
@@ -168,7 +167,7 @@ Guidelines:
     }
     await mergeIntoProfile(basicInfo)
 
-    // Phase 7: Update communication_style if detected
+    // Update communication_style if detected
     if (extractedInfo.communication_style) {
       const validStyles = ['formal', 'casual', 'friendly', 'technical', 'educational']
       if (validStyles.includes(extractedInfo.communication_style)) {
@@ -177,7 +176,7 @@ Guidelines:
       }
     }
 
-    // Phase 7: Merge expertise_levels
+    //  Merge expertise_levels
     if (extractedInfo.expertise_levels && typeof extractedInfo.expertise_levels === 'object') {
       const currentProfile = await getUserProfile()
       const currentLevels = currentProfile.expertise_levels || {}
@@ -267,8 +266,14 @@ Guidelines:
 
     return `${parts.join('\n\n')}
 
-Use this context to provide personalized, continuous responses.
-Do not mention this context unless directly asked about previous conversations or user preferences.`
+CRITICAL RULES ABOUT THIS CONTEXT:
+1. This context is STRICTLY for your internal understanding ONLY.
+2. NEVER mention, reference, list, or acknowledge the user's interests, past topics, hobbies, or personal facts.
+3. NEVER say things like "As someone interested in X", "I remember you like Y", "Given your interest in Z", or "Based on our past discussions".
+4. NEVER greet the user by referencing their profile or past sessions.
+5. Use this context SILENTLY to calibrate your tone and expertise level — nothing more.
+6. If the user asks about their profile or past conversations, THEN you may reference this.
+7. Violation of these rules makes the conversation feel intrusive and unwelcome.`
   }
 
   /**

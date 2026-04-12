@@ -31,28 +31,28 @@ function ProfileSection({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="glass-card border border-white/10 rounded-xl p-4">
       {/* Header */}
-      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-        <Icon size={16} className="text-gray-500" />
+      <div className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-3 uppercase tracking-wider">
+        <Icon size={16} className="text-neon-cyan" />
         {title}
       </div>
 
       {/* Content */}
       {items.length === 0 && !isAdding ? (
-        <p className="text-sm text-gray-400 italic">{emptyText}</p>
+        <p className="text-sm text-gray-500 italic">{emptyText}</p>
       ) : type === 'tags' ? (
         /* Tags layout */
         <div className="flex flex-wrap gap-2">
           {items.map((item, idx) => (
             <span
               key={idx}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-sm group"
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-neon-cyan/10 text-neon-cyan text-sm group border border-neon-cyan/20"
             >
               {item}
               <button
                 onClick={() => onRemove(idx)}
-                className="p-0.5 rounded-full hover:bg-purple-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 rounded-full hover:bg-neon-cyan/20 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X size={12} />
               </button>
@@ -67,9 +67,9 @@ function ProfileSection({
                 onKeyDown={handleKeyDown}
                 placeholder="Add interest..."
                 autoFocus
-                className="px-2 py-1 text-sm border border-purple-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 w-32"
+                className="px-2 py-1 text-sm border border-neon-cyan/30 bg-surface-low rounded-full focus:outline-none focus:ring-2 focus:ring-neon-cyan text-gray-100 placeholder-gray-500 w-32 transition-all"
               />
-              <button onClick={handleAdd} className="p-1 text-purple-600 hover:bg-purple-50 rounded">
+              <button onClick={handleAdd} className="p-1 text-neon-cyan hover:bg-neon-cyan/10 rounded transition-colors">
                 <Check size={14} />
               </button>
             </div>
@@ -79,11 +79,11 @@ function ProfileSection({
         /* List layout */
         <ul className="space-y-2">
           {items.map((item, idx) => (
-            <li key={idx} className="flex items-center justify-between text-sm text-gray-700 group">
+            <li key={idx} className="flex items-center justify-between text-sm text-gray-300 group">
               <span>• {item}</span>
               <button
                 onClick={() => onRemove(idx)}
-                className="p-1 text-gray-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-1 text-gray-500 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X size={14} />
               </button>
@@ -91,7 +91,7 @@ function ProfileSection({
           ))}
           {isAdding && (
             <li className="flex items-center gap-2">
-              <span className="text-gray-400">•</span>
+              <span className="text-gray-500">•</span>
               <input
                 type="text"
                 value={newValue}
@@ -99,9 +99,9 @@ function ProfileSection({
                 onKeyDown={handleKeyDown}
                 placeholder={`Add ${title.toLowerCase()}...`}
                 autoFocus
-                className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="flex-1 px-2 py-1 text-sm border border-white/10 bg-surface-low rounded-lg focus:outline-none focus:ring-2 focus:ring-neon-cyan text-gray-100 placeholder-gray-500 transition-all"
               />
-              <button onClick={handleAdd} className="p-1 text-purple-600 hover:bg-purple-50 rounded">
+              <button onClick={handleAdd} className="p-1 text-neon-cyan hover:bg-neon-cyan/10 rounded transition-colors">
                 <Check size={14} />
               </button>
             </li>
@@ -113,7 +113,7 @@ function ProfileSection({
       {!isAdding && (
         <button
           onClick={() => setIsAdding(true)}
-          className="mt-3 flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-medium"
+          className="mt-3 flex items-center gap-1 text-xs text-neon-cyan hover:text-neon-cyan/80 font-medium transition-colors"
         >
           <Plus size={12} />
           Add {type === 'tags' ? 'interest' : 'item'}

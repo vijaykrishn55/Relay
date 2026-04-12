@@ -8,7 +8,7 @@ class ConversationMemory {
 
   async load(sessionId) {
     const rows = await query(
-      'SELECT user_summary, response_summary, model, timestamp FROM conversation_summaries WHERE session_id = ? ORDER BY timestamp ASC',
+      'SELECT user_summary, response_summary, model, timestamp FROM conversation_summaries WHERE session_id = ? ORDER BY timestamp DESC LIMIT 4',
       [sessionId]
     )
     return {
@@ -30,11 +30,14 @@ class ConversationMemory {
     const data = await this.load(sessionId)
     if (!data.entries || data.entries.length === 0) return null
 
-    const lines = data.entries.map((e, i) =>
-      `[${i + 1}] User: ${e.userSummary}\n    AI (${e.model}): ${e.responseSummary}`
-    ).join('\n')
+    // Reverse to chronological (loaded DESC), take only last 2 pairs
+    const recent = data.entries.reverse().slice(-2)
 
-    return `You are continuing an ongoing conversation. Here is a summary of what was discussed so far:\n\n${lines}\n\nUse this context to give coherent, relevant responses. Do not repeat information unless asked.`
+    const lines = recent.map(e =>
+      `User asked: ${e.userSummary}\nAI answered: ${e.responseSummary}`
+    ).join('\n\n')
+
+    return lines
   }
 
   /**

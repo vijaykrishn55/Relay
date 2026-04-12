@@ -1,6 +1,6 @@
 /**
- * Strategist Service — Phase 6: Hive Mind (Phase 2)
- * Enhanced in Phase 7: Conversational Intelligence
+ * Strategist Service : Hive Mind 
+ * Enhanced : Conversational Intelligence
  *
  * Uses 2 models in conversation to craft optimal prompts for each sub-task,
  * select best-fit models using score matching, and incorporate full user context.
@@ -294,7 +294,7 @@ IMPORTANT - Use ONLY valid Mermaid syntax:
       if (p.interests) parts.push(`Interests: ${typeof p.interests === 'string' ? p.interests : JSON.stringify(p.interests)}`)
       if (p.behavior_patterns) parts.push(`Behavior patterns: ${typeof p.behavior_patterns === 'string' ? p.behavior_patterns : JSON.stringify(p.behavior_patterns)}`)
 
-      // Phase 7: Enhanced profile fields
+      //  Enhanced profile fields
       if (p.communication_style) {
         parts.push(`Communication style: ${p.communication_style}`)
       }
@@ -312,18 +312,18 @@ IMPORTANT - Use ONLY valid Mermaid syntax:
       }
     }
 
-    // Phase 7: Include sentiment data
+    //  Include sentiment data
     if (userContext.sentiment) {
       const s = userContext.sentiment
       parts.push(`Current sentiment: ${s.sentiment} (${s.intensity || 'medium'} intensity)`)
     }
 
-    // Full session context (no truncation per Phase 7)
+    // Full session context 
     if (userContext.sessionContext) {
       parts.push(`Session context: ${userContext.sessionContext}`)
     }
 
-    // Full memory context (no truncation per Phase 7)
+    // Full memory context 
     if (userContext.memoryContext) {
       parts.push(`Memories: ${userContext.memoryContext}`)
     }

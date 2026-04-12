@@ -1,6 +1,6 @@
 /**
- * Hive Orchestrator — Phase 6: Hive Mind
- * Enhanced in Phase 7: Conversational Intelligence
+ * Hive Orchestrator: Hive Mind
+ * Enhanced in: Conversational Intelligence
  *
  * Main entry point for multi-model question processing.
  * Coordinates the enhanced 7-phase pipeline:
@@ -41,7 +41,7 @@ class HiveOrchestrator {
     this.executor = new ExecutorService(providers, models)
     this.assembler = new AssemblerService(providers, models)
 
-    // Phase 7: Initialize sentiment and clarification services
+    // Initialize sentiment and clarification services
     // Use Compound Mini (id=9) for fast sentiment/clarification checks
     const compoundMini = models.find(m => m.id === 9 && m.status === 'active')
     const groqProvider = providers.groq
@@ -53,13 +53,16 @@ class HiveOrchestrator {
   /**
    * Process a user question through the Hive Mind pipeline.
    * Automatically decides between fast-path and full orchestration.
-   * Enhanced with Phase 7 sentiment and clarification checks.
+   * Enhanced with sentiment and clarification checks.
    *
    * @param {string} userQuestion
    * @param {string} systemContext - Combined system context from session/memory
+   * @param {Array} conversationHistory - Recent in-session messages [{role, content}]
+   * @param {boolean} forceHive - Force full pipeline (skip triage fast-path)
    * @returns {{ output, model, orchestration, metrics }}
    */
-  async process(userQuestion, systemContext = null) {
+  async process(userQuestion, systemContext = null, conversationHistory = [], forceHive = false) {
+    this._conversationHistory = conversationHistory
     const pipelineStart = Date.now()
 
     console.log(`\n🐝 ════════════════════════════════════════════════`)
@@ -130,9 +133,12 @@ class HiveOrchestrator {
       console.log(`📋 Phase 0: Triage...`)
       const triage = await this.decomposer.triage(userQuestion)
 
-      if (!triage.isComplex) {
+      if (!triage.isComplex && !forceHive) {
         console.log(`⚡ Fast path: Question is simple (${triage.reason})`)
         return await this._fastPath(userQuestion, triage, systemContext, pipelineStart, sentiment)
+      }
+      if (forceHive) {
+        console.log(`⚡ Force Hive: User requested full pipeline`)
       }
 
       console.log(`🧩 Complex path: ${triage.reason}`)
@@ -148,7 +154,7 @@ class HiveOrchestrator {
   /**
    * Fast path: Single model call based on score matching.
    * Used for simple, single-intent questions.
-   * Enhanced with Phase 7 persona injection.
+   * Enhanced with persona injection.
    * @private
    */
   async _fastPath(userQuestion, triage, systemContext, pipelineStart, sentiment = null) {
@@ -163,7 +169,7 @@ class HiveOrchestrator {
 
     console.log(`🎯 Fast path selected: ${model.name} (${(match.score * 100).toFixed(0)}% match)`)
 
-    // Phase 7: Build persona-enhanced system context
+    // Build persona-enhanced system context
     const personaPrompt = buildPersonaPrompt(this.userContext.profile || {}, sentiment || {})
     const questionType = triage.primaryType || 'general'
     const followUpGuide = buildFollowUpInstructions(questionType)
@@ -175,7 +181,7 @@ ${followUpGuide}
 ${systemContext || ''}`
 
     rateLimiter.record(model.id)
-    const response = await provider.callModel(model, userQuestion, enhancedContext)
+    const response = await provider.callModel(model, userQuestion, enhancedContext, this._conversationHistory || [])
 
     // Validate response has content
     if (!response.output || response.output.trim() === '') {
@@ -215,7 +221,7 @@ ${systemContext || ''}`
 
   /**
    * Full pipeline: Multi-model orchestration for complex questions.
-   * Enhanced with Phase 7 sentiment awareness.
+   * Enhanced with sentiment awareness.
    * @private
    */
   async _fullPipeline(userQuestion, triage, systemContext, pipelineStart, sentiment = null) {

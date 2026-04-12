@@ -1,6 +1,5 @@
 /**
- * Model Score Registry — Phase 6: Hive Mind
- * 
+ * Model Score Registry —Hive Mind
  * Every model gets a 0.0–1.0 score on 8 dimensions.
  * These scores are used for quantitative model selection (dot-product matching).
  */
