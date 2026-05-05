@@ -2,7 +2,9 @@
 
 An AI chat that automatically routes your prompt to the best available model across multiple providers — an Distributed AI OS.
 
-https://github.com/user-attachments/assets/b1a0f26a-06af-4d0d-9df2-bd07c4ecf24b
+
+https://github.com/user-attachments/assets/fcaa77f7-0f33-4845-bad6-90b1e330cdca
+
 
 ## 🚀 Features
 
