@@ -12,14 +12,17 @@ class CerebrasProvider {
       const startTime = Date.now()
 
       // Map our model names to valid Cerebras model IDs
-      // Valid Cerebras models: llama3.1-8b, llama-3.3-70b, qwen-3-32b
+      // Valid Cerebras models: llama3.1-8b, qwen-3-235b-a22b-instruct-2507, gpt-oss-120b
       const modelMap = {
-        'Qwen 3 32B': 'qwen-3-32b',
-        'Llama 3.3 70B': 'llama-3.3-70b',
+        'Qwen 3 235B': 'qwen-3-235b-a22b-instruct-2507',
+        'GPT OSS 120B': 'gpt-oss-120b',
         'Llama 3.1 8B': 'llama3.1-8b',
         // Legacy names (for backward compatibility with DB)
-        'Z.AI GLM 4.7': 'qwen-3-32b',
-        'OpenAI GPT OSS': 'llama-3.3-70b'
+        'Z.AI GLM 4.7': 'qwen-3-235b-a22b-instruct-2507',
+        'OpenAI GPT OSS 120B': 'gpt-oss-120b',
+        'OpenAI GPT OSS': 'gpt-oss-120b',
+        'Llama 3.3 70B': 'llama3.1-8b',
+        'Qwen 3 32B': 'qwen-3-235b-a22b-instruct-2507'
       }
 
       const cerebrasModel = modelMap[model.name] || 'llama3.1-8b'

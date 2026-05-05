@@ -7,27 +7,31 @@ class RelayService {
   }
 
   /**
-   * Build a merged prompt that combines the original question with a follow-up.
-   * The AI should produce a single comprehensive response that addresses both.
+   * Build a merged prompt that surgically updates only the relevant part of the
+   * original response to address the follow-up, keeping everything else verbatim.
    */
   buildFollowUpPrompt(originalQuestion, originalResponse, followUpQuestion) {
-    return `You previously answered a question. The user now has a follow-up that should be incorporated into a revised, comprehensive answer.
+    return `You previously gave a response. The user has a follow-up question that relates to a SPECIFIC PART of your response. Your job is to return the FULL response with ONLY the relevant section(s) updated.
 
 ORIGINAL QUESTION:
 ${originalQuestion}
 
-YOUR PREVIOUS ANSWER:
+YOUR PREVIOUS RESPONSE (FULL TEXT — preserve this exactly except where the follow-up applies):
 ${originalResponse}
 
-USER'S FOLLOW-UP:
+USER'S FOLLOW-UP QUESTION:
 ${followUpQuestion}
 
-INSTRUCTIONS:
-- Produce a single, comprehensive response that answers BOTH the original question AND the follow-up.
-- Do NOT say "as I mentioned before" or reference the previous answer — write as if this is a fresh, complete response.
-- Incorporate insights from the follow-up naturally into the response.
-- The response should be self-contained — someone reading it should not need to see the follow-up question separately.
-- Maintain the same level of detail and formatting as the original response.`
+CRITICAL INSTRUCTIONS:
+1. Identify which paragraph(s) or section(s) of your previous response the follow-up question is about.
+2. Modify, expand, or correct ONLY those specific section(s) to address the follow-up.
+3. Every paragraph, bullet point, code block, or section that is NOT related to the follow-up MUST be kept EXACTLY word-for-word as it was. Do NOT rephrase, reword, summarize, or reorganize unchanged parts.
+4. Do NOT add introductions like "Here's the updated response" or meta-commentary — just output the full response with the surgical edit.
+5. Do NOT remove any content from the original response unless the follow-up explicitly asks for removal.
+6. Maintain the exact same formatting (markdown, headers, lists, code blocks) as the original.
+7. If the follow-up asks for something new that doesn't map to an existing section, append it as a new section at the end.
+
+OUTPUT: Return the complete response with only the targeted section(s) changed.`
   }
 
   /**
@@ -145,38 +149,59 @@ Rules:
 
     if (messages.length === 0 || messageIndices.length === 0) return null
 
-    // Build transcript of only the matched messages
+    // Build transcript of ALL matched messages — include full content for comprehensive extraction
     const matchedContent = messageIndices
       .filter(i => i >= 0 && i < messages.length)
       .map(i => `[${messages[i].role.toUpperCase()}]:\n${messages[i].content}`)
       .join('\n\n---\n\n')
+
+    // Also include any other messages that might tangentially reference the topic
+    // (messages not in messageIndices but from the same session)
+    const unmatchedRelevant = messages
+      .map((m, i) => ({ ...m, idx: i }))
+      .filter(m => !messageIndices.includes(m.idx))
+      .filter(m => {
+        // Quick keyword check — include if topic words appear in content
+        const topicWords = topic.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+        const content = m.content.toLowerCase()
+        return topicWords.some(w => content.includes(w))
+      })
+
+    let extraContext = ''
+    if (unmatchedRelevant.length > 0) {
+      extraContext = '\n\n--- ADDITIONAL RELATED CONTEXT ---\n\n' +
+        unmatchedRelevant
+          .map(m => `[${m.role.toUpperCase()}]:\n${m.content}`)
+          .join('\n\n---\n\n')
+    }
 
     const extractPrompt = `You are extracting relevant context for a new conversation about a specific topic.
 
 TOPIC: "${topic}"
 
 SOURCE MESSAGES:
-${matchedContent}
+${matchedContent}${extraContext}
 
 INSTRUCTIONS:
-- Extract ONLY the sentences, paragraphs, or code blocks that are directly relevant to "${topic}"
-- Combine the extracted content into a single coherent context block
-- Do NOT include greetings, pleasantries, or off-topic content
+- Extract ALL sentences, paragraphs, code blocks, and explanations that are relevant to "${topic}"
+- Be COMPREHENSIVE — include everything that could be useful for continuing a conversation about this topic
+- Include related facts, definitions, examples, code snippets, and explanations
+- Include context that helps understand the topic even if not directly about it
+- Do NOT include greetings, pleasantries, or completely off-topic content
 - Do NOT include meta-commentary like "as mentioned" or "in the previous message"
-- Preserve important facts, explanations, code examples, and key points
-- Keep the context concise but complete - aim for the essential information only
-- Format as a clean summary that can seed a new conversation
+- Preserve important facts, explanations, code examples, and key points FULLY — do not truncate or summarize them
+- Format as a clean, well-organized context block that can seed a new conversation
 
 OUTPUT FORMAT:
-Return ONLY the extracted relevant content as a context block. No JSON, no explanations - just the distilled context.`
+Return the extracted relevant content as a comprehensive context block. No JSON, no explanations - just the distilled context.`
 
     try {
       const result = await this.aiProvider.callModel(this.routerModel, extractPrompt)
       return result.output.trim()
     } catch (err) {
       console.error('Smart context extraction failed:', err.message)
-      // Fallback: return first 500 chars of each matched message
-      return matchedContent.substring(0, 2000)
+      // Fallback: return full matched content
+      return (matchedContent + extraContext).substring(0, 4000)
     }
   }
 
@@ -192,11 +217,12 @@ Return ONLY the extracted relevant content as a context block. No JSON, no expla
 
     if (messages.length < 2) return null
 
+    // Use longer content snippets for better topic matching
     const transcript = messages
-      .map((m, i) => `[${i}][${m.role.toUpperCase()}]: ${m.content.substring(0, 300)}`)
+      .map((m, i) => `[${i}][${m.role.toUpperCase()}]: ${m.content.substring(0, 800)}`)
       .join('\n\n')
 
-    const matchPrompt = `The user wants to extract messages about a specific topic from this conversation.
+    const matchPrompt = `The user wants to start a NEW conversation about a specific topic, using ALL relevant information from the current conversation.
 
 USER'S TOPIC DESCRIPTION:
 "${userDescription}"
@@ -204,7 +230,7 @@ USER'S TOPIC DESCRIPTION:
 CONVERSATION:
 ${transcript}
 
-Find ALL messages related to the user's topic. Return ONLY this JSON:
+Find ALL messages that contain information related to the user's topic. Return ONLY this JSON:
 {
   "name": "<short topic name based on user description>",
   "description": "${userDescription}",
@@ -213,9 +239,12 @@ Find ALL messages related to the user's topic. Return ONLY this JSON:
 }
 
 Rules:
-- Include messages that are directly or contextually related to the topic
-- Include both user and assistant messages in the topic
-- If a user asks about the topic, include the assistant's response too
+- Be COMPREHENSIVE — include every message that has ANY relevant information about the topic
+- Include messages that are directly, contextually, or tangentially related
+- Include both user questions AND their corresponding assistant responses
+- If a user asks about the topic, ALWAYS include the full assistant response
+- Include messages that provide background context or definitions related to the topic
+- When in doubt, INCLUDE the message — it's better to have too much context than too little
 - Return ONLY the JSON, no other text`
 
     try {

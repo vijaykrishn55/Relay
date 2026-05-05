@@ -190,6 +190,8 @@
     font-size: 0.8125rem;
     line-height: 1.65;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    white-space: pre;
+    word-wrap: normal;
   }
   .code-block-body code {
     color: #e5e7eb;
@@ -207,17 +209,31 @@
     background: #111114;
     overflow: hidden;
     margin: 0.75rem 0;
+    max-width: 100%;
+  }
+  .mermaid-viewer:not(.fixed) {
+    height: auto;
+    max-height: 420px;
   }
   .mermaid-canvas {
     overflow: hidden;
     cursor: grab;
-    min-height: 200px;
+    height: 100%;
+    min-height: 340px;
+    max-height: 380px;
+  }
+  /* Fullscreen: let canvas fill the viewport */
+  .fixed .mermaid-canvas,
+  .mermaid-canvas.flex-1 {
+    min-height: 0;
+    max-height: none;
   }
   .mermaid-canvas:active { cursor: grabbing; }
   .mermaid-canvas svg {
     display: block;
     margin: 0 auto;
     max-width: none !important;
+    max-height: 100%;
   }
 
   /* ─── Context Meter ─── */
@@ -263,6 +279,79 @@
   @keyframes typingBounce {
     0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
     40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ─── Relay Follow-up Hover Tooltip ─── */
+  .relay-followups-container {
+    position: relative;
+    display: inline-flex;
+    margin-left: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .relay-followups-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    background: rgba(0, 229, 255, 0.08);
+    border: 1px solid rgba(0, 229, 255, 0.15);
+    color: rgba(0, 229, 255, 0.6);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    cursor: default;
+    transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+  }
+  .relay-followups-container:hover .relay-followups-badge {
+    background: rgba(0, 229, 255, 0.15);
+    border-color: rgba(0, 229, 255, 0.3);
+    color: rgba(0, 229, 255, 0.9);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.1);
+  }
+  .relay-followups-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 240px;
+    max-width: 400px;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.75rem;
+    background: rgba(21, 21, 23, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 229, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+    pointer-events: none;
+  }
+  .relay-followups-container:hover .relay-followups-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .relay-followups-tooltip-title {
+    font-size: 0.625rem;
+    color: #6b7280;
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .relay-followups-tooltip-item {
+    font-size: 0.6875rem;
+    color: #9ca3af;
+    line-height: 1.5;
+    padding: 0.15rem 0;
+  }
+  .relay-followups-tooltip-arrow {
+    color: rgba(0, 229, 255, 0.5);
+    margin-right: 0.25rem;
   }
 }
 

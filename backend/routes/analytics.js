@@ -47,7 +47,6 @@ router.get('/dashboard', async (req, res) => {
          FROM orchestration_logs ORDER BY created_at DESC LIMIT 10`
       )
       recentActivity = rows.map(r => ({
-        time: r.created_at ? new Date(r.created_at).toLocaleTimeString() : 'N/A',
         sessionId: r.session_id,
         question: r.user_question ? r.user_question.substring(0, 80) : '',
         model: (() => {
@@ -71,7 +70,6 @@ router.get('/dashboard', async (req, res) => {
            ORDER BY m.timestamp DESC LIMIT 10`
         )
         recentActivity = rows.map(r => ({
-          time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'N/A',
           sessionId: r.session_id,
           question: '',
           model: r.model || 'unknown',

@@ -5,6 +5,7 @@ import { memoryAPI } from '../../services/api'
 function SavedTab({ onCountUpdate }) {
   const [memories, setMemories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
@@ -14,26 +15,28 @@ function SavedTab({ onCountUpdate }) {
   const fetchMemories = async (query) => {
     try {
       setLoading(true)
+      setError(null)
       const res = await memoryAPI.getAll(query || '')
       setMemories(res.data)
       if (onCountUpdate) onCountUpdate(res.data.length)
     } catch (err) {
       console.error('Failed to fetch memories:', err)
+      setError('Failed to load memories')
     } finally {
       setLoading(false)
     }
   }
 
+  // Single useEffect: fetch immediately for empty query, debounce for search
   useEffect(() => {
-    fetchMemories()
-  }, [])
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchMemories(searchQuery)
-    }, 300)
-    return () => clearTimeout(timer)
+    if (searchQuery) {
+      const timer = setTimeout(() => {
+        fetchMemories(searchQuery)
+      }, 300)
+      return () => clearTimeout(timer)
+    } else {
+      fetchMemories()
+    }
   }, [searchQuery])
 
   const handleDelete = async (id) => {
@@ -47,6 +50,7 @@ function SavedTab({ onCountUpdate }) {
       })
     } catch (err) {
       console.error('Failed to delete memory:', err)
+      setError('Failed to delete memory. Try again.')
     }
   }
 
@@ -66,6 +70,7 @@ function SavedTab({ onCountUpdate }) {
       setEditingId(null)
     } catch (err) {
       console.error('Failed to update memory:', err)
+      setError('Failed to update memory. Try again.')
     }
   }
 
@@ -98,7 +103,14 @@ function SavedTab({ onCountUpdate }) {
       </div>
 
       {/* Memory list */}
-      {loading ? (
+      {error ? (
+        <div className="text-center py-12">
+          <p className="text-red-400">{error}</p>
+          <button onClick={() => fetchMemories(searchQuery)} className="mt-2 text-neon-cyan hover:underline">
+            Try again
+          </button>
+        </div>
+      ) : loading ? (
         <div className="text-center text-gray-400 py-12">Loading memories...</div>
       ) : memories.length === 0 ? (
         <div className="text-center py-16 bg-white/5 border border-white/10 rounded-xl">

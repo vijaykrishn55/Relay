@@ -1,4 +1,5 @@
 const { query } = require('../data/db')
+const { repairAndParseJson } = require('../utils/jsonRepair')
 
 class ConversationMemory {
   constructor(groqProvider, routerModel) {
@@ -62,9 +63,7 @@ Return JSON:
 
       let parsed
       try {
-        let cleaned = result.output.trim()
-        cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-        parsed = JSON.parse(cleaned)
+        parsed = repairAndParseJson(result.output)
       } catch {
         parsed = {
           userSummary: userMessage.length > 120 ? userMessage.substring(0, 120) + '...' : userMessage,

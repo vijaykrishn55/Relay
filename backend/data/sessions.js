@@ -16,9 +16,19 @@ async function getSession(id) {
 
   const session = rows[0]
   const messages = await query(
-    'SELECT role, content, model, timestamp FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
+    'SELECT id, role, content, model, timestamp, relay_followups, orchestration, metrics FROM messages WHERE session_id = ? ORDER BY timestamp ASC',
     [id]
   )
+
+  // Parse JSON columns that mysql2 may not auto-parse
+  for (const msg of messages) {
+    if (msg.orchestration && typeof msg.orchestration === 'string') {
+      try { msg.orchestration = JSON.parse(msg.orchestration) } catch { msg.orchestration = null }
+    }
+    if (msg.metrics && typeof msg.metrics === 'string') {
+      try { msg.metrics = JSON.parse(msg.metrics) } catch { msg.metrics = null }
+    }
+  }
 
   // mysql2 auto-parses JSON columns — only parse if it's still a string
   let contextMessages = null
@@ -78,8 +88,12 @@ async function addMessage(sessionId, message) {
   if (!session) return null
 
   await query(
-    'INSERT INTO messages (session_id, role, content, model, timestamp) VALUES (?, ?, ?, ?, NOW())',
-    [sessionId, message.role, message.content, message.model || null]
+    'INSERT INTO messages (session_id, role, content, model, timestamp, orchestration, metrics) VALUES (?, ?, ?, ?, NOW(), ?, ?)',
+    [
+      sessionId, message.role, message.content, message.model || null,
+      message.orchestration ? JSON.stringify(message.orchestration) : null,
+      message.metrics       ? JSON.stringify(message.metrics)       : null,
+    ]
   )
 
   // auto-title: use first user message
@@ -136,4 +150,16 @@ async function touchSession(id) {
   await query('UPDATE sessions SET updated_at = NOW() WHERE id = ?', [id])
   return true
 }
-module.exports = { createSession, createSessionWithContext, getSession, getAllSessions, updateSession, deleteSession, addMessage, touchSession }
+// Update a single message's content
+async function updateMessage(messageId, content) {
+  await query('UPDATE messages SET content = ? WHERE id = ?', [content, messageId])
+  return true
+}
+
+// Delete a single message by ID
+async function deleteMessage(messageId) {
+  const result = await query('DELETE FROM messages WHERE id = ?', [messageId])
+  return result.affectedRows > 0
+}
+
+module.exports = { createSession, createSessionWithContext, getSession, getAllSessions, updateSession, deleteSession, addMessage, touchSession, updateMessage, deleteMessage }

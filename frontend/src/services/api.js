@@ -30,6 +30,8 @@ export const sessionsAPI = {
   createWithContext: (contextMessages, parentSessionId = null, topic = null) =>
     api.post('/sessions/with-context', { contextMessages, parentSessionId, topic }),
   touch: (id) => api.post(`/sessions/${id}/touch`),
+  editMessage: (sessionId, msgId, content) => api.put(`/sessions/${sessionId}/messages/${msgId}`, { content }),
+  deleteMessage: (sessionId, msgId) => api.delete(`/sessions/${sessionId}/messages/${msgId}`),
 }
 
 export const memoryAPI = {

@@ -123,9 +123,9 @@ DEALLOCATE PREPARE stmt;
 -- ============================================================
 REPLACE INTO models (id, name, provider, status, capabilities, cost_per_1k, avg_latency, rate_limit, context_window, max_output_tokens, endpoint, model_id, api_provider) VALUES
 (2,  'Codestral',              'Mistral',  'active', '["text-generation","code","reasoning","documentation"]',     0, 250, '{"rpm":60,"tpm":100000}',                       128000, 128000, 'https://codestral.mistral.ai', 'codestral-latest',                              'mistral'),
-(3,  'Qwen 3 32B',             'Cerebras', 'active', '["text-generation","code","reasoning"]',                     0, 180, '{"rpm":10,"tpm":60000,"rpd":100}',              128000, 128000, 'https://api.cerebras.ai',      'qwen-3-32b',                                    'cerebras'),
-(4,  'Llama 3.3 70B',          'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":64000,"rpd":14400}',            128000,  65536, 'https://api.cerebras.ai',      'llama-3.3-70b',                                 'cerebras'),
-(5,  'Llama 3.1 8B',           'Cerebras', 'active', '["text-generation","code"]',                                 0, 150, '{"rpm":30,"tpm":60000,"rpd":14400}',            128000, 128000, 'https://api.cerebras.ai',      'llama3.1-8b',                                   'cerebras'),
+(3,  'Qwen 3 235B',            'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":60000,"rpd":14400}',            128000, 128000, 'https://api.cerebras.ai',      'qwen-3-235b-a22b-instruct-2507',                'cerebras'),
+(4,  'Llama 3.1 8B',           'Cerebras', 'active', '["text-generation","code","reasoning"]',                     0, 100, '{"rpm":30,"tpm":64000,"rpd":14400}',            128000,  65536, 'https://api.cerebras.ai',      'llama3.1-8b',                                   'cerebras'),
+(5,  'GPT OSS 120B',           'Cerebras', 'active', '["text-generation","code","reasoning","analysis"]',          0, 200, '{"rpm":30,"tpm":60000,"rpd":14400}',            128000, 128000, 'https://api.cerebras.ai',      'gpt-oss-120b',                                  'cerebras'),
 (6,  'Allam 2 7B',             'Groq',     'active', '["text-generation","multilingual"]',                         0, 150, '{"rpm":30,"rpd":7000,"tpm":6000,"tpd":500000}', 4096,   4096,  'https://api.groq.com',         'allam-2-7b',                                    'groq'),
 (7,  'Llama 3.1 8B Instant',   'Groq',     'active', '["text-generation","code"]',                                 0, 120, '{"rpm":30,"rpd":14400,"tpm":6000,"tpd":500000}',131072, 131072, 'https://api.groq.com',         'llama-3.1-8b-instant',                          'groq'),
 (8,  'Llama 4 Scout 17B',      'Groq',     'active', '["text-generation","reasoning","analysis"]',                 0, 160, '{"rpm":30,"rpd":1000,"tpm":30000,"tpd":500000}',131072,  8192,  'https://api.groq.com',         'meta-llama/llama-4-scout-17b-16e-instruct',     'groq'),
@@ -231,6 +231,21 @@ DEALLOCATE PREPARE stmt;
 
 SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sessions' AND index_name = 'idx_sessions_parent');
 SET @sql = IF(@idx_exists = 0, 'CREATE INDEX idx_sessions_parent ON sessions(parent_session_id)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 11.5 ORCHESTRATION DATA — Persist Hive trace on messages
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = 'orchestration');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE messages ADD COLUMN orchestration JSON DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = 'metrics');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE messages ADD COLUMN metrics JSON DEFAULT NULL', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

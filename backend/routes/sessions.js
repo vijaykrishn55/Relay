@@ -8,7 +8,9 @@ const{
         updateSession,
         deleteSession,
         addMessage,
-        touchSession
+        touchSession,
+        updateMessage,
+        deleteMessage
 }= require('../data/sessions')
 const { loadModels } = require('../data/models')
 const GroqProvider = require('../services/groqProvider')
@@ -140,6 +142,31 @@ router.post('/:id/touch', async (req, res) => {
         } catch (error) {
                 res.status(500).json({ error: error.message })
         }
+})
+
+// PUT /api/sessions/:id/messages/:msgId - edit a message
+router.put('/:id/messages/:msgId', async (req, res) => {
+  try {
+    const { content } = req.body
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: 'Content is required' })
+    }
+    await updateMessage(req.params.msgId, content.trim())
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// DELETE /api/sessions/:id/messages/:msgId - delete a message
+router.delete('/:id/messages/:msgId', async (req, res) => {
+  try {
+    const deleted = await deleteMessage(req.params.msgId)
+    if (!deleted) return res.status(404).json({ error: 'Message not found' })
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 module.exports = router

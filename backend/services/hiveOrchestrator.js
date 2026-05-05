@@ -5,7 +5,6 @@
  * Main entry point for multi-model question processing.
  * Coordinates the enhanced 7-phase pipeline:
  *   Phase -1: Sentiment Analysis
- *   Phase -0.5: Clarification Check
  *   Phase 0: Triage
  *   Phase 1: Decompose
  *   Phase 2: Strategize
@@ -22,7 +21,7 @@ const AssemblerService = require('./assemblerService')
 const SentimentService = require('./sentimentService')
 const ClarificationService = require('./clarificationService')
 const { selectBestModel } = require('./scoreMatcher')
-const { buildPersonaPrompt, buildFollowUpInstructions } = require('./systemPersona')
+const { buildPersonaPrompt } = require('./systemPersona')
 const rateLimiter = require('../utils/rateLimiter')
 
 class HiveOrchestrator {
@@ -84,64 +83,25 @@ class HiveOrchestrator {
       })
 
       // ═══════════════════════════════════════════════
-      // PHASE -0.5: CLARIFICATION CHECK (optional, ~200ms)
-      // ═══════════════════════════════════════════════
-      const askClarifications = this.userContext.profile?.engagement_preferences?.askClarifications
-      if (askClarifications !== false) {
-        console.log(`❓ Phase -0.5: Clarification Check...`)
-        const clarification = await this.clarificationService.check(userQuestion, this.userContext.profile)
-
-        if (clarification.needsClarification && clarification.confidence >= 0.75) {
-          console.log(`   → Needs clarification: ${clarification.reason}`)
-
-          const clarificationMessage = this.clarificationService.formatClarificationMessage(
-            clarification, userQuestion
-          )
-
-          return {
-            output: clarificationMessage,
-            model: 'clarification-check',
-            provider: 'system',
-            decision: {
-              model: 'clarification-check',
-              reason: clarification.reason,
-              mode: 'clarification'
-            },
-            metrics: {
-              latency: Date.now() - pipelineStart,
-              pipelineLatency: Date.now() - pipelineStart,
-              cost: '0.0000',
-              tokensUsed: 0
-            },
-            orchestration: {
-              mode: 'clarification',
-              isComplex: false,
-              sentiment: sentiment,
-              clarification: clarification,
-              phases: ['sentiment', 'clarification']
-            }
-          }
-        }
-        console.log(`   → Question is clear (confidence: ${(clarification.confidence * 100).toFixed(0)}%)`)
-      } else {
-        console.log(`❓ Phase -0.5: Skipped (clarifications disabled by user)`)
-      }
-
-      // ═══════════════════════════════════════════════
       // PHASE 0: TRIAGE — Decide simple vs complex
       // ═══════════════════════════════════════════════
       console.log(`📋 Phase 0: Triage...`)
       const triage = await this.decomposer.triage(userQuestion)
 
-      if (!triage.isComplex && !forceHive) {
-        console.log(`⚡ Fast path: Question is simple (${triage.reason})`)
+      // Normal Mode (`!forceHive`): Always use a single model (Fast Path).
+      // We still use the triage result to pick the *best* single model.
+      if (!forceHive) {
+        console.log(`⚡ Fast path (Normal Mode): Using best single model (${triage.reason})`)
         return await this._fastPath(userQuestion, triage, systemContext, pipelineStart, sentiment)
       }
-      if (forceHive) {
-        console.log(`⚡ Force Hive: User requested full pipeline`)
+
+      // Hive Mode (`forceHive`): Use Fast Path if simple, Full Pipeline if complex.
+      if (!triage.isComplex) {
+        console.log(`⚡ Fast path (Hive Mode): Question is simple (${triage.reason})`)
+        return await this._fastPath(userQuestion, triage, systemContext, pipelineStart, sentiment)
       }
 
-      console.log(`🧩 Complex path: ${triage.reason}`)
+      console.log(`🧩 Complex path (Hive Mode): User requested and triage confirmed complex (${triage.reason})`)
       return await this._fullPipeline(userQuestion, triage, systemContext, pipelineStart, sentiment)
 
     } catch (error) {
@@ -170,13 +130,12 @@ class HiveOrchestrator {
     console.log(`🎯 Fast path selected: ${model.name} (${(match.score * 100).toFixed(0)}% match)`)
 
     // Build persona-enhanced system context
+    // NOTE: Do NOT inject buildFollowUpInstructions here.
+    // Follow-up question prompting is a Relay-only feature.
+    // Normal mode should just answer the question cleanly.
     const personaPrompt = buildPersonaPrompt(this.userContext.profile || {}, sentiment || {})
-    const questionType = triage.primaryType || 'general'
-    const followUpGuide = buildFollowUpInstructions(questionType)
 
     const enhancedContext = `${personaPrompt}
-
-${followUpGuide}
 
 ${systemContext || ''}`
 
@@ -371,7 +330,7 @@ ${systemContext || ''}`
 
       try {
         rateLimiter.record(model.id)
-        const response = await provider.callModel(model, userQuestion, systemContext)
+        const response = await provider.callModel(model, userQuestion, systemContext, this._conversationHistory || [])
 
         return {
           output: response.output,

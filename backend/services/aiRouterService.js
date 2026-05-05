@@ -185,9 +185,9 @@ CRITICAL: Return ONLY this JSON, nothing else:
   getModelSpecialty(model) {
     const specialties = {
       'Codestral': 'code generation, debugging, technical documentation',
-      'Z.AI GLM 4.7': 'coding with advanced reasoning, tool use',
-      'OpenAI GPT OSS': 'real-time coding, large documents, Q&A, research',
-      'Llama 3.1 8B': 'speed-critical tasks, high-throughput',
+      'Qwen 3 235B': 'reasoning, analysis, multilingual, complex research',
+      'GPT OSS 120B': 'high-quality reasoning, research, large documents',
+      'Llama 3.1 8B': 'fast responses, quick Q&A, simple tasks',
       'Allam 2 7B': 'multilingual tasks, international content',
       'Llama 3.1 8B Instant': 'ultra-fast simple tasks, quick responses',
       'Llama 4 Scout 17B': 'reasoning, analysis, research tasks',

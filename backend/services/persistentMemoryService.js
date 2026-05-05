@@ -1,5 +1,6 @@
 const { query } = require('../data/db')
 const { getUserProfile, mergeIntoProfile, updateUserProfile, buildProfileContext } = require('../data/userProfile')
+const { repairAndParseJson } = require('../utils/jsonRepair')
 const {
   createSessionSummary,
   hasSessionSummary,
@@ -70,7 +71,7 @@ Return this exact JSON structure:
   "outcomes": ["<decision or result 1>", "<result 2>"],
   "user_info": {
     "name": "<user's name if explicitly stated, or null>",
-    "preferences": ["<communication preference>"],
+    "preferences": ["<any stated preference — tools, frameworks, communication style, response format, etc.>"],
     "interests": ["<topic they're interested in>"],
     "personal_facts": ["<fact about the user they mentioned>"],
     "communication_style": "<formal|casual|friendly|technical|educational or null if unclear>",
@@ -97,7 +98,8 @@ Guidelines:
   - advanced: uses technical jargon, asks nuanced questions
 - For arrays, use empty arrays [] if nothing was mentioned
 - Do not infer name - only include if explicitly stated
-- For expertise_levels, only include topics actually discussed`
+- For expertise_levels, only include topics actually discussed
+- IMPORTANT: If the user says "I prefer X", "I like Y", or "add Z to preferences", capture those as preferences`
 
       console.log(`🔄 Generating summary for session ${sessionId}...`)
 
@@ -106,10 +108,7 @@ Guidelines:
       // Parse the AI response
       let parsed
       try {
-        let cleaned = result.output.trim()
-        // Remove markdown code blocks if present
-        cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-        parsed = JSON.parse(cleaned)
+        parsed = repairAndParseJson(result.output)
       } catch (parseError) {
         console.error(`⚠️ Failed to parse summary JSON for session ${sessionId}:`, parseError.message)
         // Create a basic summary from the conversation

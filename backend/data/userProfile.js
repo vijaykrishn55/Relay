@@ -118,6 +118,7 @@ async function updateUserProfile(updates) {
 
   if (fields.length === 0) return getUserProfile()
 
+  fields.push('updated_at = NOW()')
   values.push(1) // id = 1
   await query(
     `UPDATE user_profiles SET ${fields.join(', ')} WHERE id = ?`,
@@ -246,7 +247,8 @@ async function clearUserProfile() {
       sentiment_trend = NULL,
       expertise_levels = NULL,
       engagement_preferences = NULL,
-      response_preferences = NULL
+      response_preferences = NULL,
+      updated_at = NOW()
     WHERE id = 1`
   )
   return getUserProfile()

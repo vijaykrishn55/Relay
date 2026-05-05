@@ -193,12 +193,6 @@ class RelayPipeline {
 
     const enhancedContext = `${personaPrompt}
 
-ENGAGEMENT GUIDELINES:
-- End with 1-2 natural follow-up questions when appropriate
-- Frame questions conversationally: "Would you like me to..." not "Options:"
-- Skip follow-ups if the answer is already complete and self-contained
-- Match the user's communication style
-
 ${followUpGuide}
 
 ${context}`

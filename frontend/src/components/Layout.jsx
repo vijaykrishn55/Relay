@@ -35,7 +35,7 @@ function Layout({ children }) {
         {/* Logo — fixed top */}
         <div className="px-5 pt-5 pb-3 flex-shrink-0">
           <h2 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-neon-cyan to-neon-purple">
-            Distributed OS
+            Relay
           </h2>
           <p className="text-[10px] text-neon-cyan/60 mt-1 uppercase tracking-[0.2em] font-semibold flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-neon-cyan animate-pulse" />

@@ -9,6 +9,7 @@ const ModelConversation = require('./modelConversation')
 const { selectModelPair } = require('./scoreMatcher')
 const { SCORE_DIMENSIONS } = require('../data/modelScores')
 const rateLimiter = require('../utils/rateLimiter')
+const { repairAndParseJson } = require('../utils/jsonRepair')
 
 class DecomposerService {
   /**
@@ -35,53 +36,34 @@ class DecomposerService {
     const triageModel = pair.modelB.avgLatency <= pair.modelA.avgLatency ? pair.modelB : pair.modelA
     const provider = this._getProvider(triageModel)
 
-    const prompt = `You are a question triage system. Analyze this question and determine if it requires multi-model orchestration.
+    const prompt = `You are a JSON-only classifier. Do NOT answer the question. Do NOT add explanation.
 
 QUESTION: "${userQuestion}"
 
-A question is COMPLEX if ANY of these are true:
-- It asks for MULTIPLE DISTINCT things (e.g., "explain X AND write code for Y")
-- It requires expertise in 2+ different domains (e.g., code + creative writing)
-- It needs both deep reasoning AND factual knowledge with detailed output
-- It explicitly asks for diagrams/code/analysis in the same question
-- The expected answer would be >500 words with distinct sections
+COMPLEX = asks for multiple distinct things, needs 2+ different skills, or expects >500 word answer with distinct sections.
+SIMPLE = one clear intent, one skill type, answerable in <300 words.
 
-A question is SIMPLE if:
-- It has ONE clear intent (e.g., "What is recursion?")
-- It needs only one type of skill (e.g., just code, or just explanation)
-- It can be fully answered in <300 words
+Score each dimension 0.0 to 1.0:
+- reasoning: logical deduction needed
+- code: programming needed
+- creativity: creative writing needed
+- speed: 1.0 if quick answer wanted
+- multilingual: non-English needed
+- analysis: data comparison needed
+- instruction: structured output needed
+- knowledge: factual depth needed
 
-SCORING: Rate each dimension 0.0–1.0 based on how much the question NEEDS that skill:
-- reasoning: logical deduction, step-by-step thinking needed
-- code: code generation, debugging, programming needed
-- creativity: creative writing, brainstorming needed
-- speed: 1.0 if user wants quick answer, 0.0 if quality matters more
-- multilingual: non-English language needed
-- analysis: data comparison, structured evaluation needed
-- instruction: structured/formatted output needed (tables, lists, specific format)
-- knowledge: deep factual knowledge needed
+Return ONLY raw JSON. No markdown. No code fences. No explanation before or after.
 
-CRITICAL: You are a CLASSIFIER ONLY. Do NOT answer the user's question. Return ONLY this JSON:
-{
-  "isComplex": true,
-  "questionScores": {
-    "reasoning": 0.0,
-    "code": 0.0,
-    "creativity": 0.0,
-    "speed": 0.0,
-    "multilingual": 0.0,
-    "analysis": 0.0,
-    "instruction": 0.0,
-    "knowledge": 0.0
-  },
-  "primaryType": "<one of: explanation, code, analysis, creative, diagram, translation, factual, deep_reasoning, current_data>",
-  "reason": "<1 sentence why complex or simple>"
-}`
+Example output:
+{"isComplex": false, "questionScores": {"reasoning": 0.3, "code": 0.0, "creativity": 0.1, "speed": 0.8, "multilingual": 0.0, "analysis": 0.1, "instruction": 0.2, "knowledge": 0.5}, "primaryType": "factual", "reason": "Simple factual question with one intent"}
+
+Now classify the question above. Return ONLY the JSON object:`
 
     try {
       rateLimiter.record(triageModel.id)
-      const response = await provider.callModel(triageModel, prompt)
-      const parsed = this._parseJson(response.output)
+      const response = await provider.callModel(triageModel, prompt, 'You are a JSON classifier. Respond with ONLY a raw JSON object. No markdown, no prose, no code fences.')
+      const parsed = repairAndParseJson(response.output)
 
       // Validate scores
       if (parsed.questionScores) {
@@ -202,7 +184,7 @@ CRITICAL: Return ONLY the JSON, do NOT answer the user's question.`
       rateLimiter.record(pair.modelB.id)
 
       const result = await conversation.converse(initialPrompt, reviewTemplate)
-      const parsed = this._parseJson(result.finalOutput)
+      const parsed = repairAndParseJson(result.finalOutput)
 
       // Validate and sanitize subtasks
       const subtasks = this._validateSubtasks(parsed.subtasks || [])
@@ -280,13 +262,7 @@ CRITICAL: Return ONLY the JSON, do NOT answer the user's question.`
     return providerMap[model.apiProvider]
   }
 
-  _parseJson(raw) {
-    let cleaned = raw.trim()
-    cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-    if (jsonMatch) cleaned = jsonMatch[0]
-    return JSON.parse(cleaned)
-  }
+  // _parseJson removed — replaced by shared repairAndParseJson from utils/jsonRepair.js
 
   _defaultScores() {
     const scores = {}

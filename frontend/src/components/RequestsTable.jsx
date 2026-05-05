@@ -14,7 +14,7 @@ function RequestsTable({ requests, onOpenSession }) {
       <table className="min-w-full">
         <thead>
           <tr className="border-b border-white/5">
-            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Time</th>
+
             <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Query</th>
             <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Model</th>
             <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Latency</th>
@@ -27,7 +27,7 @@ function RequestsTable({ requests, onOpenSession }) {
         <tbody className="divide-y divide-white/3">
           {requests.map((request, index) => (
             <tr key={index} className="hover:bg-white/3 transition-colors">
-              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-400">{request.time}</td>
+
               <td className="px-4 py-3 text-xs text-gray-300 max-w-[200px] truncate">{request.question || '—'}</td>
               <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-300 font-medium max-w-[180px] truncate">{request.model || '—'}</td>
               <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-400">

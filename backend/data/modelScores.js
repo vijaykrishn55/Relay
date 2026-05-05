@@ -34,54 +34,54 @@ const MODEL_SCORES = {
   },
 
   3: {
-    name: 'Qwen 3 32B',
+    name: 'Qwen 3 235B',
     provider: 'Cerebras',
     scores: {
-      reasoning: 0.75,
+      reasoning: 0.9,
       code: 0.85,
-      creativity: 0.5,
-      speed: 0.7,
-      multilingual: 0.4,
-      analysis: 0.7,
-      instruction: 0.7,
-      knowledge: 0.65
+      creativity: 0.65,
+      speed: 0.6,
+      multilingual: 0.8,
+      analysis: 0.85,
+      instruction: 0.85,
+      knowledge: 0.85
     },
-    roles: ['specialist'],
-    bestFor: 'Coding with advanced reasoning, tool use'
+    roles: ['specialist', 'assembler'],
+    bestFor: 'Reasoning, analysis, multilingual, complex research tasks'
   },
 
   4: {
-    name: 'Llama 3.3 70B',
-    provider: 'Cerebras',
-    scores: {
-      reasoning: 0.8,
-      code: 0.8,
-      creativity: 0.65,
-      speed: 0.65,
-      multilingual: 0.6,
-      analysis: 0.8,
-      instruction: 0.75,
-      knowledge: 0.8
-    },
-    roles: ['specialist', 'assembler'],
-    bestFor: 'Real-time coding, Q&A, research, large documents'
-  },
-
-  5: {
     name: 'Llama 3.1 8B',
     provider: 'Cerebras',
     scores: {
-      reasoning: 0.5,
+      reasoning: 0.55,
       code: 0.6,
       creativity: 0.5,
       speed: 0.9,
-      multilingual: 0.3,
-      analysis: 0.45,
-      instruction: 0.6,
+      multilingual: 0.4,
+      analysis: 0.5,
+      instruction: 0.65,
       knowledge: 0.5
     },
-    roles: ['decomposer', 'strategist'],
-    bestFor: 'Speed-critical tasks, batch processing, quick routing'
+    roles: ['specialist', 'decomposer'],
+    bestFor: 'Fast responses, quick Q&A, simple code tasks'
+  },
+
+  5: {
+    name: 'GPT OSS 120B',
+    provider: 'Cerebras',
+    scores: {
+      reasoning: 0.85,
+      code: 0.8,
+      creativity: 0.65,
+      speed: 0.6,
+      multilingual: 0.6,
+      analysis: 0.8,
+      instruction: 0.8,
+      knowledge: 0.8
+    },
+    roles: ['specialist', 'assembler'],
+    bestFor: 'High-quality reasoning, research, large document analysis'
   },
 
   6: {
@@ -89,7 +89,6 @@ const MODEL_SCORES = {
     provider: 'Groq',
     scores: {
       reasoning: 0.4,
-      code: 0.2,
       creativity: 0.5,
       speed: 0.7,
       multilingual: 0.9,
